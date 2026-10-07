@@ -11,7 +11,12 @@ export type SceneOptions = {
   aspect: number;
 };
 
-export type Scene = (u: number, v: number, t: number, o: SceneOptions) => number;
+export type Scene = (
+  u: number,
+  v: number,
+  t: number,
+  o: SceneOptions,
+) => number;
 
 /** Linear fade top -> bottom. Use for dissolving panel edges. */
 const fade: Scene = (_u, v) => v;
@@ -35,32 +40,52 @@ const clouds: Scene = (u, v, t, o) => {
  * reference images, built from noise. Tones: sky 0-0.33, mountains
  * ~0.45-0.78, plain 0.8-1.
  */
-const horizon: Scene = (u, v, t, o) => {
-  const x = u * o.aspect;
-  // Ridged noise gives peaks instead of blobs.
-  const ridged = 1 - Math.abs(2 * fbm(x * 0.8 + 1.7, 0.3, o.seed, 5) - 1);
-  // Portrait frames get more sky so type has room.
-  const lift = o.aspect < 1 ? 0.18 * (1 - o.aspect) : 0;
-  const far = 0.66 + lift - 0.2 * ridged * ridged;
-  const near = 0.72 + lift - 0.05 * fbm(x * 2.2 + 8.3, 0.7, o.seed + 4, 4);
-  if (v < far) {
+type HorizonSun = { x: number; y: number; r: number };
+
+function makeHorizon(sunDisc?: HorizonSun): Scene {
+  return (u, v, t, o) => {
+    const x = u * o.aspect;
+    // Ridged noise gives peaks instead of blobs.
+    const ridged = 1 - Math.abs(2 * fbm(x * 0.8 + 1.7, 0.3, o.seed, 5) - 1);
+    // Portrait frames get more sky so type has room.
+    const lift = o.aspect < 1 ? 0.18 * (1 - o.aspect) : 0;
+    const far = 0.66 + lift - 0.2 * ridged * ridged;
+    const near = 0.72 + lift - 0.05 * fbm(x * 2.2 + 8.3, 0.7, o.seed + 4, 4);
+    if (v < far) {
+      // A low sun behind the range, halftoning toward its base (the logo's sun).
+    // It sits just above the ridge line and shrinks in portrait frames.
+    if (sunDisc) {
+      const r = sunDisc.r * Math.min(1, o.aspect);
+      const dx = (u - sunDisc.x) * o.aspect;
+      const dy = v - (sunDisc.y + lift);
+      if (dx * dx + dy * dy < r * r) {
+        const k = (dy + r) / (2 * r);
+        return 0.92 - Math.pow(k, 1.6) * 0.55;
+      }
+    }
     // Sky stays dark so type can sit on it.
-    const g = Math.pow(v / far, 3);
-    const drift = fbm(x * 1.5 + t * 0.02, v * 6, o.seed + 2, 3);
-    return 0.03 + 0.3 * g + 0.05 * (drift - 0.5);
-  }
-  if (v < near) {
-    // Mountains: lighter than the sky, etched with noise, lit along the ridge.
-    if (v - far < 0.01) return 0.78;
-    const k = (v - far) / Math.max(0.001, near - far);
-    const shade = fbm(x * 12, v * 16, o.seed + 6, 3);
-    return 0.56 + 0.08 * k + 0.24 * (shade - 0.5);
-  }
-  // Plain: brightest, with sparse grass tufts that grow toward the viewer.
-  const d = (v - near) / (1 - near);
-  const tuft = fbm(x * (26 - 14 * d), v * (120 - 70 * d), o.seed + 11, 3);
-  return 0.8 + 0.2 * d - (tuft > 0.66 ? 0.45 : 0);
-};
+      const g = Math.pow(v / far, 3);
+      const drift = fbm(x * 1.5 + t * 0.02, v * 6, o.seed + 2, 3);
+      return 0.03 + 0.3 * g + 0.05 * (drift - 0.5);
+    }
+    if (v < near) {
+      // Mountains: lighter than the sky, etched with noise, lit along the ridge.
+      if (v - far < 0.01) return 0.78;
+      const k = (v - far) / Math.max(0.001, near - far);
+      const shade = fbm(x * 12, v * 16, o.seed + 6, 3);
+      return 0.56 + 0.08 * k + 0.24 * (shade - 0.5);
+    }
+    // Plain: brightest, with sparse grass tufts that grow toward the viewer.
+    const d = (v - near) / (1 - near);
+    const tuft = fbm(x * (26 - 14 * d), v * (120 - 70 * d), o.seed + 11, 3);
+    return 0.8 + 0.2 * d - (tuft > 0.66 ? 0.45 : 0);
+  };
+}
+
+const horizon = makeHorizon();
+
+/** Dawn: the horizon with an ember sun rising behind the far range. */
+const dawn = makeHorizon({ x: 0.78, y: 0.52, r: 0.17 });
 
 /**
  * Ember sun: solid at the top, breaking into halftone toward the bottom,
@@ -89,5 +114,13 @@ const forge: Scene = (u, v, t, o) => {
   return Math.max(0, Math.min(1, heat * 0.9 + (n - 0.5) * 0.7));
 };
 
-export const SCENES = { fade, glow, clouds, horizon, sun, forge } satisfies Record<string, Scene>;
+export const SCENES = {
+  fade,
+  glow,
+  clouds,
+  horizon,
+  dawn,
+  sun,
+  forge,
+} satisfies Record<string, Scene>;
 export type SceneName = keyof typeof SCENES;
