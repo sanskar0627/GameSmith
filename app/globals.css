@@ -397,6 +397,13 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+  /* Popups receive focus programmatically; the ring belongs on their contents. */
+  [role="dialog"]:focus-visible,
+  [role="alertdialog"]:focus-visible,
+  [role="menu"]:focus-visible,
+  [role="listbox"]:focus-visible {
+    outline: none;
+  }
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

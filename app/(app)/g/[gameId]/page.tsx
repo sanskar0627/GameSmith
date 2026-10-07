@@ -1,23 +1,56 @@
 import type { Metadata } from "next";
-import { Workspace } from "@/components/workspace/workspace";
+import { notFound } from "next/navigation";
+import { Workspace, type WorkspaceGame } from "@/components/workspace/workspace";
+import { getDemoGame, getDemoVersions } from "@/lib/games/mock";
+import type { GameCard } from "@/lib/games/types";
 import { isDemoScenario } from "@/lib/workspace/mock";
 
 export const metadata: Metadata = { title: "Workspace · GameSmith" };
 
+/** The scratch game behind /new and the ?demo= review states. */
+const DEMO_GAME: GameCard = {
+  id: "demo",
+  title: "Floating Islands",
+  status: "ready",
+  version: 2,
+  genre: "Adventure",
+  pitch: "",
+  createdAt: new Date(Date.UTC(2026, 9, 9, 10)).toISOString(),
+  updatedAt: new Date(Date.UTC(2026, 9, 9, 11)).toISOString(),
+  visibility: "private",
+  coverSeed: 11,
+};
+
 /**
- * Game workspace. Until persistence lands every id opens the demo game.
- * TODO(data): load the game via requireGameAccess(gameId) and stream its
- * messages/build state instead of the demo snapshot.
- * Review states with ?demo=fresh|ask|building|thread|crash.
+ * Game workspace.
+ * TODO(data): requireGameAccess(gameId), then load the game, its messages and
+ * build state instead of demo data.
+ * Review states with ?demo=fresh|ask|building|thread|crash, ?panel=versions.
  */
 export default async function GamePage({
+  params,
   searchParams,
 }: {
   params: Promise<{ gameId: string }>;
-  searchParams: Promise<{ demo?: string; prompt?: string | string[] }>;
+  searchParams: Promise<{ demo?: string; prompt?: string | string[]; panel?: string }>;
 }) {
-  const { demo, prompt } = await searchParams;
+  const { gameId } = await params;
+  const { demo, prompt, panel } = await searchParams;
+  const card = gameId === "demo" ? DEMO_GAME : getDemoGame(gameId);
+  if (!card) notFound();
+
   const scenario = isDemoScenario(demo) ? demo : "thread";
   const autoPrompt = typeof prompt === "string" && prompt.trim() ? prompt.slice(0, 2000) : undefined;
-  return <Workspace key={`${scenario}:${autoPrompt ?? ""}`} scenario={scenario} autoPrompt={autoPrompt} />;
+  const game: WorkspaceGame = { id: card.id, title: card.title, visibility: card.visibility, isDemo: card.id === "demo" };
+
+  return (
+    <Workspace
+      key={`${gameId}:${scenario}:${autoPrompt ?? ""}`}
+      game={game}
+      versions={getDemoVersions(card)}
+      scenario={scenario}
+      autoPrompt={autoPrompt}
+      initialPanel={panel === "versions" ? "versions" : undefined}
+    />
+  );
 }
