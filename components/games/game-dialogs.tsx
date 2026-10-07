@@ -69,7 +69,7 @@ function RenameForm({
       className="flex flex-col gap-4"
     >
       <DialogHeader>
-        <DialogTitle className="font-display text-display-sm font-normal">
+        <DialogTitle>
           Rename game
         </DialogTitle>
         <DialogDescription>
@@ -135,7 +135,7 @@ function DeleteForm({
       className="flex flex-col gap-4"
     >
       <AlertDialogHeader>
-        <AlertDialogTitle className="font-display text-display-sm font-normal">
+        <AlertDialogTitle>
           Delete &ldquo;{title}&rdquo;?
         </AlertDialogTitle>
         <AlertDialogDescription>
@@ -221,7 +221,7 @@ export function ShareDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-display-sm font-normal">
+          <DialogTitle>
             Share &ldquo;{title}&rdquo;
           </DialogTitle>
           <DialogDescription>

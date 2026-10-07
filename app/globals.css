@@ -188,8 +188,9 @@
   --shadow-float: 0 1px 0 0 var(--hairline), 0 12px 32px -16px var(--float-shadow);
 }
 
-/* Paper: the default theme, matches the logo */
-:root {
+/* Paper: the default theme, matches the logo. `.light` forces it inside a Night subtree. */
+:root,
+.light {
   --radius: 0.375rem;
 
   --background: #f8f4ea;

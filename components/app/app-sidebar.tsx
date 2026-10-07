@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Plus } from "lucide-react";
+import { LayoutGrid, Plus, Settings } from "lucide-react";
 import { Wordmark } from "@/components/brand/wordmark";
 import { Spark } from "@/components/brand/spark";
 import {
@@ -20,15 +20,19 @@ import {
 } from "@/components/ui/sidebar";
 import type { GameSummary } from "@/lib/games/types";
 import { AccountMenu } from "./account-menu";
+import { SparksMeter } from "./sparks-meter";
 import { GameNavItem } from "./game-nav-item";
 
-const NAV = [{ href: "/games", label: "Games", icon: LayoutGrid }] as const;
+const NAV = [
+  { href: "/games", label: "Games", icon: LayoutGrid },
+  { href: "/settings", label: "Settings", icon: Settings },
+] as const;
 
 /** Active marker: a 2px ember bar on the left edge, nothing else. */
 const navItemClass =
   "relative data-active:bg-sidebar-accent data-active:font-medium before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-ember before:opacity-0 data-active:before:opacity-100 group-data-[collapsible=icon]:before:hidden";
 
-export function AppSidebar({ games }: { games: GameSummary[] }) {
+export function AppSidebar({ games, sparks }: { games: GameSummary[]; sparks: { used: number; allowance: number } }) {
   const pathname = usePathname();
 
   return (
@@ -66,7 +70,7 @@ export function AppSidebar({ games }: { games: GameSummary[] }) {
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton
                     tooltip={label}
-                    isActive={pathname === href}
+                    isActive={pathname === href || pathname.startsWith(`${href}/`)}
                     render={<Link href={href} />}
                     className={navItemClass}
                   >
@@ -97,7 +101,8 @@ export function AppSidebar({ games }: { games: GameSummary[] }) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-2">
+      <SidebarFooter className="gap-1 border-t border-sidebar-border p-2">
+        <SparksMeter {...sparks} />
         <AccountMenu />
       </SidebarFooter>
       <SidebarRail />
