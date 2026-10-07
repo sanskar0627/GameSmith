@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import type { Viewport } from "next";
 import { Geist, Geist_Mono, Geist_Pixel, Instrument_Serif } from "next/font/google";
 import "./globals.css";
-import { SiteHeader } from "@/components/site-header";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,8 +48,23 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${geistPixel.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ClerkProvider appearance={{ theme: shadcn }}>
-          <SiteHeader />
+        <ClerkProvider
+          appearance={{ theme: shadcn }}
+          localization={{
+            signIn: {
+              start: {
+                title: "Sign in",
+                subtitle: "Pick up where you left off.",
+              },
+            },
+            signUp: {
+              start: {
+                title: "Create your account",
+                subtitle: "Free to start. No game engine required.",
+              },
+            },
+          }}
+        >
           {children}
         </ClerkProvider>
       </body>

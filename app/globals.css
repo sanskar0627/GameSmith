@@ -4,6 +4,8 @@
 @import "@clerk/ui/themes/shadcn.css";
 
 @custom-variant dark (&:is(.dark *));
+/* Short viewports (small laptops): drop secondary hero content. */
+@custom-variant short (@media (max-height: 760px));
 
 /* ==========================================================================
    GameSmith design system: "Ember on Bone"
