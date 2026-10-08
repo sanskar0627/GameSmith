@@ -3,7 +3,8 @@ import { Show, SignUpButton } from "@clerk/nextjs";
 import { ArrowRight } from "lucide-react";
 import { Spark } from "@/components/brand/spark";
 import { DitherField } from "@/components/dither/dither-field";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 /**
  * Minimal home. A real landing and the signed-in workspace come later;
@@ -37,9 +38,9 @@ export default async function Home() {
             </SignUpButton>
           </Show>
           <Show when="signed-in">
-            <span className="label-pixel rounded-sm border border-border px-2 py-1.5 text-muted-foreground">
-              Workspace opening soon
-            </span>
+            <Link href="/games" className={buttonVariants({ variant: "ember", size: "lg" })}>
+              Open GameSmith <ArrowRight data-icon="inline-end" />
+            </Link>
           </Show>
         </div>
       </section>

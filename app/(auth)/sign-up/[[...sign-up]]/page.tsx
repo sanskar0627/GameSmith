@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Create account · GameSmith" };
 export default function SignUpPage() {
   return (
     <AuthShell variant="sign-up">
-      <SignUp appearance={authAppearance} />
+      <SignUp appearance={authAppearance} fallbackRedirectUrl="/games" />
     </AuthShell>
   );
 }
