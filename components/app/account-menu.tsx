@@ -36,7 +36,7 @@ export function AccountMenu() {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <SidebarMenuButton size="lg" className="gap-2.5 data-popup-open:bg-sidebar-accent" aria-label="Account menu" />
+              <SidebarMenuButton size="lg" className="gap-2.5 data-popup-open:bg-sidebar-accent" />
             }
           >
             {isLoaded && user ? (
@@ -49,7 +49,8 @@ export function AccountMenu() {
               <span className="truncate text-[13px] font-medium">{isLoaded ? name : "Loading"}</span>
               <span className="truncate text-xs text-muted-foreground">{email}</span>
             </span>
-            <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+            <span className="sr-only">, account menu</span>
+            <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" aria-hidden />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             side={isMobile ? "top" : "right"}

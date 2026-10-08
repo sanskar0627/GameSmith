@@ -3,7 +3,7 @@ import { NewGameComposer } from "@/components/app/new-game-composer";
 import { PageHeader } from "@/components/app/page-header";
 import { Spark } from "@/components/brand/spark";
 
-export const metadata: Metadata = { title: "New game · GameSmith" };
+export const metadata: Metadata = { title: "New game" };
 
 export default async function NewGamePage({ searchParams }: { searchParams: Promise<{ prompt?: string | string[] }> }) {
   const { prompt } = await searchParams;

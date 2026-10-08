@@ -7,7 +7,7 @@ import { FileBrowser } from "@/components/games/file-browser";
 import { buttonVariants } from "@/components/ui/button";
 import { DEMO_FILES, getDemoGame } from "@/lib/games/mock";
 
-export const metadata: Metadata = { title: "Files · GameSmith" };
+export const metadata: Metadata = { title: "Files" };
 
 export default async function GameFilesPage({ params }: { params: Promise<{ gameId: string }> }) {
   const { gameId } = await params;

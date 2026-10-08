@@ -6,7 +6,7 @@ import { Library } from "@/components/games/library";
 import { Badge } from "@/components/ui/badge";
 import { DEMO_GAMES } from "@/lib/games/mock";
 
-export const metadata: Metadata = { title: "Games · GameSmith" };
+export const metadata: Metadata = { title: "Games" };
 
 export default function GamesPage() {
   // TODO(data): load the signed-in user's games (owner or org) instead of demo data.

@@ -3,11 +3,11 @@ import Link from "next/link";
 import { DitherField } from "@/components/dither/dither-field";
 import { buttonVariants } from "@/components/ui/button";
 
-export const metadata: Metadata = { title: "Not found · GameSmith" };
+export const metadata: Metadata = { title: "Not found" };
 
 export default function NotFound() {
   return (
-    <main className="relative isolate flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-6 pb-40 text-center">
+    <main id="main" className="relative isolate flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-6 pb-40 text-center">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-56">
         <DitherField scene="clouds" pixel={3} seed={12} palette={["transparent", "--dither-mid"]} bias={-0.1} />
       </div>

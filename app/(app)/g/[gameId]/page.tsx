@@ -5,7 +5,7 @@ import { getDemoGame, getDemoVersions } from "@/lib/games/mock";
 import type { GameCard } from "@/lib/games/types";
 import { isDemoScenario } from "@/lib/workspace/mock";
 
-export const metadata: Metadata = { title: "Workspace · GameSmith" };
+export const metadata: Metadata = { title: "Workspace" };
 
 /** The scratch game behind /new and the ?demo= review states. */
 const DEMO_GAME: GameCard = {

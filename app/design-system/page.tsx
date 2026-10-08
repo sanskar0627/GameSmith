@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { ArrowRight, ArrowUp, Gamepad2, Plus, TriangleAlert } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUp,
+  Gamepad2,
+  Plus,
+  TriangleAlert,
+} from "lucide-react";
 import { Wordmark } from "@/components/brand/wordmark";
 import { Spark } from "@/components/brand/spark";
 import { DitherProgress, PixelLoader } from "@/components/brand/pixel-loader";
@@ -14,12 +20,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { SparksMeter } from "@/components/app/sparks-meter";
+import { GameCover } from "@/components/games/game-cover";
+import { GameStatusChip } from "@/components/games/game-status";
+import { BriefCard } from "@/components/workspace/chat/brief-card";
+import { Checkpoint, ToolLog } from "@/components/workspace/chat/parts";
+import { DEMO_BRIEF } from "@/lib/workspace/mock";
 
 /**
  * Living style guide for the GameSmith design system (Stage 1).
  * Internal: hidden in production builds.
  */
-export const metadata: Metadata = { title: "Design system · GameSmith" };
+export const metadata: Metadata = { title: "Design system" };
 
 const BONE = [
   ["50", "#fcfaf5"],
@@ -49,51 +61,133 @@ const EMBER = [
 ] as const;
 
 const SCENES = [
-  { scene: "horizon", title: "Horizon", use: "Auth, landing, onboarding", palette: ["--dither-ink", "--ember", "--dither-paper"] },
-  { scene: "sun", title: "Ember sun", use: "Hero moments, success", palette: ["--dither-paper", "--ember"] },
-  { scene: "clouds", title: "Cloud bank", use: "Empty states, backdrops", palette: ["--dither-paper", "--dither-mid"] },
-  { scene: "forge", title: "Forge", use: "Building a game (animated)", palette: ["--dither-ink", "--color-ember-800", "--ember", "--color-ember-200"], animated: true },
-  { scene: "glow", title: "Glow", use: "Focus halos, preview idle", palette: ["--dither-ink", "--ember"] },
-  { scene: "fade", title: "Fade", use: "Dissolving edges", palette: ["transparent", "--dither-ink"] },
+  {
+    scene: "horizon",
+    title: "Horizon",
+    use: "Auth, landing, onboarding",
+    palette: ["--dither-ink", "--ember", "--dither-paper"],
+  },
+  {
+    scene: "sun",
+    title: "Ember sun",
+    use: "Hero moments, success",
+    palette: ["--dither-paper", "--ember"],
+  },
+  {
+    scene: "clouds",
+    title: "Cloud bank",
+    use: "Empty states, backdrops",
+    palette: ["--dither-paper", "--dither-mid"],
+  },
+  {
+    scene: "forge",
+    title: "Forge",
+    use: "Building a game (animated)",
+    palette: [
+      "--dither-ink",
+      "--color-ember-800",
+      "--ember",
+      "--color-ember-200",
+    ],
+    animated: true,
+  },
+  {
+    scene: "glow",
+    title: "Glow",
+    use: "Focus halos, preview idle",
+    palette: ["--dither-ink", "--ember"],
+  },
+  {
+    scene: "fade",
+    title: "Fade",
+    use: "Dissolving edges",
+    palette: ["transparent", "--dither-ink"],
+  },
 ] as const;
 
 export default function DesignSystemPage() {
   if (process.env.NODE_ENV === "production") notFound();
 
   return (
-    <main className="flex-1 bg-background">
+    <main id="main" className="flex-1 bg-background">
       <Hero />
       <div className="mx-auto flex max-w-6xl flex-col gap-28 px-4 py-24 sm:px-8">
-        <Section index="01" title="Brand" lede="One mark, one glyph, one accent. The spark is the dot of the i, and it marks every AI moment.">
+        <Section
+          index="01"
+          title="Brand"
+          lede="One mark, one glyph, one accent. The spark is the dot of the i, and it marks every AI moment."
+        >
           <BrandSection />
         </Section>
-        <Section index="02" title="Color" lede="A single warm ramp from bone to ink, and ember. Hierarchy comes from tone and texture, never from extra hues.">
+        <Section
+          index="02"
+          title="Color"
+          lede="A single warm ramp from bone to ink, and ember. Hierarchy comes from tone and texture, never from extra hues."
+        >
           <ColorSection />
         </Section>
-        <Section index="03" title="Typography" lede="Editorial serif for voice, Geist for work, mono for the machine, pixel for labels.">
+        <Section
+          index="03"
+          title="Typography"
+          lede="Editorial serif for voice, Geist for work, mono for the machine, pixel for labels."
+        >
           <TypeSection />
         </Section>
-        <Section index="04" title="Space & shape" lede="4px grid. Crisp radii. Hairlines over boxes. Depth comes from a hard key shadow, not blur.">
+        <Section
+          index="04"
+          title="Space & shape"
+          lede="4px grid. Crisp radii. Hairlines over boxes. Depth comes from a hard key shadow, not blur."
+        >
           <ShapeSection />
         </Section>
-        <Section index="05" title="Dither" lede="The identity is the dither. Procedural scenes replace stock imagery; ordered masks texture fills, edges and progress.">
+        <Section
+          index="05"
+          title="Dither"
+          lede="The identity is the dither. Procedural scenes replace stock imagery; ordered masks texture fills, edges and progress."
+        >
           <DitherSection />
         </Section>
-        <Section index="06" title="Controls" lede="Ink is the default action. Ember is the forge action, one per view.">
+        <Section
+          index="06"
+          title="Controls"
+          lede="Ink is the default action. Ember is the forge action, one per view."
+        >
           <ControlsSection />
         </Section>
-        <Section index="07" title="States" lede="Waiting should feel like the forge is working: stepped, pixel, never a generic spinner.">
+        <Section
+          index="07"
+          title="States"
+          lede="Waiting should feel like the forge is working: stepped, pixel, never a generic spinner."
+        >
           <StatesSection />
         </Section>
-        <Section index="08" title="Night" lede="The same system after dark. Every token flips; nothing is redesigned.">
+        <Section
+          index="08"
+          title="Night"
+          lede="The same system after dark. Every token flips; nothing is redesigned."
+        >
           <NightSection />
+        </Section>
+        <Section
+          index="09"
+          title="Product"
+          lede="The pieces the app is built from: status, covers, the agent's work log, versions and credits."
+        >
+          <ProductSection />
         </Section>
       </div>
       <footer className="dark relative h-72 overflow-hidden bg-background">
-        <DitherField scene="horizon" seed={3} pixel={3} palette={["--dither-ink", "--dither-mid", "--dither-paper"]} />
+        <DitherField
+          scene="horizon"
+          seed={3}
+          pixel={3}
+          palette={["--dither-ink", "--dither-mid", "--dither-paper"]}
+        />
         <div className="absolute inset-x-0 top-10 flex flex-col items-center gap-3">
           <Wordmark height={15} className="text-foreground" />
-          <span className="label-pixel text-muted-foreground">Design system v0.1</span>
+          <span className="label-pixel text-muted-foreground">
+            Design system v0.1
+          </span>
         </div>
       </footer>
     </main>
@@ -106,23 +200,36 @@ function Hero() {
   return (
     <section className="dark relative isolate h-[min(78vh,720px)] min-h-[520px] overflow-hidden bg-background text-foreground">
       <div className="absolute inset-0 -z-10">
-        <DitherField scene="horizon" pixel={3} seed={11} palette={["--dither-ink", "--color-ember-900", "--ember", "--color-ember-200"]} />
+        <DitherField
+          scene="horizon"
+          pixel={3}
+          seed={11}
+          palette={[
+            "--dither-ink",
+            "--color-ember-900",
+            "--ember",
+            "--color-ember-200",
+          ]}
+        />
       </div>
       <div className="mx-auto flex h-full max-w-6xl flex-col px-4 py-10 sm:px-8 sm:py-12">
         <div className="flex items-center justify-between">
           <Wordmark height={30} className="text-foreground" />
-          <span className="label-pixel text-muted-foreground">Design system · v0.1</span>
+          <span className="label-pixel text-muted-foreground">
+            Design system · v0.1
+          </span>
         </div>
         <div className="mt-[8vh] max-w-3xl">
           <p className="label-pixel mb-5 flex items-center gap-2 text-ember-text">
             <Spark size={14} twinkle /> Stage 01 · Visual language
           </p>
           <h1 className="font-display text-display-xl text-foreground sm:text-display-2xl">
-            Describe a world. <em className="text-ember">We&rsquo;ll forge it.</em>
+            Describe a world.{" "}
+            <em className="text-ember">We&rsquo;ll forge it.</em>
           </h1>
           <p className="mt-6 max-w-md text-[15px] leading-relaxed text-bone-400">
-            Ember on bone. Ordered dither as texture, not decoration. A creative tool with the quiet of an editorial page and the
-            pulse of a game.
+            Ember on bone. Ordered dither as texture, not decoration. A creative
+            tool with the quiet of an editorial page and the pulse of a game.
           </p>
         </div>
       </div>
@@ -130,20 +237,40 @@ function Hero() {
   );
 }
 
-function Section({ index, title, lede, children }: { index: string; title: string; lede: string; children: ReactNode }) {
+function Section({
+  index,
+  title,
+  lede,
+  children,
+}: {
+  index: string;
+  title: string;
+  lede: string;
+  children: ReactNode;
+}) {
   return (
     <section className="grid gap-10 lg:grid-cols-[220px_1fr] lg:gap-16">
       <header className="lg:sticky lg:top-24 lg:self-start">
         <span className="label-pixel text-ember-text">{index}</span>
         <h2 className="mt-3 font-display text-display-md">{title}</h2>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{lede}</p>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          {lede}
+        </p>
       </header>
       <div className="min-w-0">{children}</div>
     </section>
   );
 }
 
-function Panel({ label, className, children }: { label?: string; className?: string; children: ReactNode }) {
+function Panel({
+  label,
+  className,
+  children,
+}: {
+  label?: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
     <div className={cn("rounded-lg border border-border bg-card", className)}>
       {label && (
@@ -184,37 +311,80 @@ function BrandSection() {
           <Spark size={28} twinkle className="text-foreground" />
         </div>
         <p className="mt-4 text-sm text-muted-foreground">
-          Draw at multiples of 7px. Ember marks the agent; ink when it is a static ornament.
+          Draw at multiples of 7px. Ember marks the agent; ink when it is a
+          static ornament.
         </p>
       </Panel>
       <Panel label="Source · logo.png dithered" className="md:col-span-2">
         <div className="grid gap-4 sm:grid-cols-3">
-          <DitherImage src="/logo.png" alt="GameSmith logo" className="aspect-square rounded-md border border-hairline" pixel={2} />
-          <DitherImage src="/logo.png" alt="GameSmith logo, ink dither" className="aspect-square rounded-md border border-hairline" palette={["--dither-ink", "--dither-paper"]} pixel={3} />
+          <DitherImage
+            src="/logo.png"
+            alt="GameSmith logo"
+            className="aspect-square rounded-md border border-hairline"
+            pixel={2}
+          />
+          <DitherImage
+            src="/logo.png"
+            alt="GameSmith logo, ink dither"
+            className="aspect-square rounded-md border border-hairline"
+            palette={["--dither-ink", "--dither-paper"]}
+            pixel={3}
+          />
           <div className="group relative aspect-square">
-            <DitherImage src="/logo.png" alt="GameSmith logo, hover to reveal" className="size-full rounded-md border border-hairline" palette={["--color-ember-900", "--ember", "--color-ember-100"]} pixel={4} reveal />
-            <span className="label-pixel absolute bottom-3 left-3 rounded-sm bg-background/90 px-1.5 py-1 text-muted-foreground">Hover: reveal</span>
+            <DitherImage
+              src="/logo.png"
+              alt="GameSmith logo, hover to reveal"
+              className="size-full rounded-md border border-hairline"
+              palette={["--color-ember-900", "--ember", "--color-ember-100"]}
+              pixel={4}
+              reveal
+            />
+            <span className="label-pixel absolute bottom-3 left-3 rounded-sm bg-background/90 px-1.5 py-1 text-muted-foreground">
+              Hover: reveal
+            </span>
           </div>
         </div>
         <p className="mt-4 max-w-xl text-sm text-muted-foreground">
-          Every generated game gets a dithered thumbnail in the same palette, so a grid of wildly different games still reads
-          as one library. The real image reveals on hover.
+          Every generated game gets a dithered thumbnail in the same palette, so
+          a grid of wildly different games still reads as one library. The real
+          image reveals on hover.
         </p>
       </Panel>
       <Panel label="Principles" className="md:col-span-2">
         <ol className="grid gap-x-10 gap-y-4 text-sm sm:grid-cols-2">
           {[
-            ["Texture over hue", "One accent. Depth and emphasis come from dither density and tone."],
-            ["Editorial calm", "Generous space, serif voice, few borders. The game is the loudest thing on screen."],
-            ["Stepped motion", "Animations move in steps like sprites. No floaty easing on brand moments."],
-            ["Ember means agency", "Ember marks the forge action and the agent. If everything is ember, nothing is."],
-            ["Real pixels", "Pixel art is drawn on a grid and scaled by integers. Never blur a pixel."],
-            ["Quiet chrome", "Hairlines, not boxes. Panels recede so conversation and preview lead."],
+            [
+              "Texture over hue",
+              "One accent. Depth and emphasis come from dither density and tone.",
+            ],
+            [
+              "Editorial calm",
+              "Generous space, serif voice, few borders. The game is the loudest thing on screen.",
+            ],
+            [
+              "Stepped motion",
+              "Animations move in steps like sprites. No floaty easing on brand moments.",
+            ],
+            [
+              "Ember means agency",
+              "Ember marks the forge action and the agent. If everything is ember, nothing is.",
+            ],
+            [
+              "Real pixels",
+              "Pixel art is drawn on a grid and scaled by integers. Never blur a pixel.",
+            ],
+            [
+              "Quiet chrome",
+              "Hairlines, not boxes. Panels recede so conversation and preview lead.",
+            ],
           ].map(([t, d], i) => (
             <li key={t} className="flex gap-3">
-              <span className="label-pixel mt-0.5 text-ember-text">{String(i + 1).padStart(2, "0")}</span>
+              <span className="label-pixel mt-0.5 text-ember-text">
+                {String(i + 1).padStart(2, "0")}
+              </span>
               <span>
-                <span className="font-medium">{t}.</span> <span className="text-muted-foreground">{d}</span>
+                <span className="font-medium">{t}.</span>{" "}
+                <span className="text-muted-foreground">{d}</span>
               </span>
             </li>
           ))}
@@ -226,7 +396,13 @@ function BrandSection() {
 
 /* --- 02 Color ------------------------------------------------------------ */
 
-function Ramp({ name, steps }: { name: string; steps: readonly (readonly string[])[] }) {
+function Ramp({
+  name,
+  steps,
+}: {
+  name: string;
+  steps: readonly (readonly string[])[];
+}) {
   return (
     <div>
       <span className="label-pixel text-muted-foreground">{name}</span>
@@ -236,8 +412,14 @@ function Ramp({ name, steps }: { name: string; steps: readonly (readonly string[
             <div className="h-16" style={{ background: hex }} />
             <div className="flex flex-col gap-0.5 bg-card px-2 py-2">
               <span className="font-mono text-[11px]">{step}</span>
-              <span className="font-mono text-[10px] text-muted-foreground uppercase">{hex.slice(1)}</span>
-              {role && <span className="text-[10px] leading-tight text-ember-text">{role}</span>}
+              <span className="font-mono text-[10px] text-muted-foreground uppercase">
+                {hex.slice(1)}
+              </span>
+              {role && (
+                <span className="text-[10px] leading-tight text-ember-text">
+                  {role}
+                </span>
+              )}
             </div>
           </div>
         ))}
@@ -263,20 +445,39 @@ function ColorSection() {
       <Ramp name="Ember" steps={EMBER} />
       <div className="grid gap-4 md:grid-cols-2">
         {["", "dark"].map((mode) => (
-          <div key={mode || "paper"} className={cn(mode, "rounded-lg border border-border bg-background p-5 text-foreground")}>
-            <span className="label-pixel text-muted-foreground">{mode ? "Night tokens" : "Paper tokens"}</span>
+          <div
+            key={mode || "paper"}
+            className={cn(
+              mode,
+              "rounded-lg border border-border bg-background p-5 text-foreground",
+            )}
+          >
+            <span className="label-pixel text-muted-foreground">
+              {mode ? "Night tokens" : "Paper tokens"}
+            </span>
             <div className="mt-4 grid grid-cols-4 gap-3">
               {tokens.map(([name, cls]) => (
                 <div key={name} className="flex flex-col gap-1.5">
-                  <div className={cn("h-10 rounded-sm border border-hairline", cls)} />
-                  <span className="font-mono text-[10px] text-muted-foreground">{name}</span>
+                  <div
+                    className={cn(
+                      "h-10 rounded-sm border border-hairline",
+                      cls,
+                    )}
+                  />
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    {name}
+                  </span>
                 </div>
               ))}
             </div>
             <div className="mt-5 flex flex-col gap-1 border-t border-hairline pt-4 text-sm">
               <span>Foreground text</span>
-              <span className="text-muted-foreground">Muted text, AA on both themes</span>
-              <span className="text-ember-text">Ember text, links and agent names</span>
+              <span className="text-muted-foreground">
+                Muted text, AA on both themes
+              </span>
+              <span className="text-ember-text">
+                Ember text, links and agent names
+              </span>
             </div>
           </div>
         ))}
@@ -291,13 +492,19 @@ function ColorSection() {
             ["Ember on night", "5.6 : 1"],
             ["Muted-500 on night", "6.3 : 1"],
           ].map(([k, v]) => (
-            <li key={k} className="flex justify-between border-b border-hairline py-1.5">
+            <li
+              key={k}
+              className="flex justify-between border-b border-hairline py-1.5"
+            >
               <span className="text-muted-foreground">{k}</span>
               <span>{v}</span>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-muted-foreground">Pure ember on paper is 3.1 : 1. Use it for display type and fills, never body text.</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Pure ember on paper is 3.1 : 1. Use it for display type and fills,
+          never body text.
+        </p>
       </Panel>
     </div>
   );
@@ -318,7 +525,10 @@ function TypeSection() {
       <Panel label="Display · Instrument Serif">
         <div className="flex flex-col gap-5">
           {scale.map(([name, metric, cls]) => (
-            <div key={name} className="flex items-baseline gap-6 border-b border-hairline pb-4 last:border-0 last:pb-0">
+            <div
+              key={name}
+              className="flex items-baseline gap-6 border-b border-hairline pb-4 last:border-0 last:pb-0"
+            >
               <span className="w-24 shrink-0 font-mono text-[11px] text-muted-foreground">
                 {name}
                 <br />
@@ -333,25 +543,39 @@ function TypeSection() {
       </Panel>
       <div className="grid gap-4 md:grid-cols-3">
         <Panel label="UI · Geist Sans">
-          <p className="text-xl font-semibold tracking-tight">Make the enemies faster</p>
-          <p className="mt-2 text-[15px] leading-relaxed">Body 15/1.55. Used for chat, settings and every working surface.</p>
-          <p className="mt-2 text-[13px] text-muted-foreground">Small 13. Metadata, helper text, timestamps.</p>
+          <p className="text-xl font-semibold tracking-tight">
+            Make the enemies faster
+          </p>
+          <p className="mt-2 text-[15px] leading-relaxed">
+            Body 15/1.55. Used for chat, settings and every working surface.
+          </p>
+          <p className="mt-2 text-[13px] text-muted-foreground">
+            Small 13. Metadata, helper text, timestamps.
+          </p>
         </Panel>
         <Panel label="Machine · Geist Mono">
           <pre className="font-mono text-[12.5px] leading-relaxed text-muted-foreground">
-            <span className="text-foreground">write_file</span> src/game/enemies.ts{"\n"}
-            <span className="text-ember-text">replace_text</span> speed: 2 → 3.4{"\n"}
+            <span className="text-foreground">write_file</span>{" "}
+            src/game/enemies.ts{"\n"}
+            <span className="text-ember-text">replace_text</span> speed: 2 → 3.4
+            {"\n"}
             <span className="text-foreground">read_file</span> src/main.ts
           </pre>
-          <p className="mt-3 text-[13px] text-muted-foreground">Tool calls, files, code, errors.</p>
+          <p className="mt-3 text-[13px] text-muted-foreground">
+            Tool calls, files, code, errors.
+          </p>
         </Panel>
         <Panel label="Labels · Geist Pixel">
           <div className="flex flex-col gap-3">
             <span className="label-pixel">Now forging</span>
-            <span className="label-pixel text-ember-text">Level 03 · Night</span>
+            <span className="label-pixel text-ember-text">
+              Level 03 · Night
+            </span>
             <span className="font-pixel text-3xl tabular-nums">1,280</span>
           </div>
-          <p className="mt-3 text-[13px] text-muted-foreground">Eyebrows, chips, keys, counters. Never sentences.</p>
+          <p className="mt-3 text-[13px] text-muted-foreground">
+            Eyebrows, chips, keys, counters. Never sentences.
+          </p>
         </Panel>
       </div>
     </div>
@@ -367,7 +591,9 @@ function ShapeSection() {
         <div className="flex flex-col gap-2">
           {[1, 2, 3, 4, 6, 8, 12, 16, 24].map((n) => (
             <div key={n} className="flex items-center gap-4">
-              <span className="w-10 font-mono text-[11px] text-muted-foreground">{n * 4}px</span>
+              <span className="w-10 font-mono text-[11px] text-muted-foreground">
+                {n * 4}px
+              </span>
               <div className="h-2 bg-ember" style={{ width: n * 4 }} />
             </div>
           ))}
@@ -396,19 +622,27 @@ function ShapeSection() {
         <div className="grid gap-6 sm:grid-cols-4">
           <div className="flex flex-col gap-2">
             <div className="h-16 rounded-md border border-hairline bg-card" />
-            <span className="font-mono text-[11px] text-muted-foreground">hairline · dividers</span>
+            <span className="font-mono text-[11px] text-muted-foreground">
+              hairline · dividers
+            </span>
           </div>
           <div className="flex flex-col gap-2">
             <div className="h-16 rounded-md border border-border bg-card" />
-            <span className="font-mono text-[11px] text-muted-foreground">border · panels</span>
+            <span className="font-mono text-[11px] text-muted-foreground">
+              border · panels
+            </span>
           </div>
           <div className="flex flex-col gap-2">
             <div className="h-16 rounded-md bg-ember shadow-key" />
-            <span className="font-mono text-[11px] text-muted-foreground">shadow-key · press</span>
+            <span className="font-mono text-[11px] text-muted-foreground">
+              shadow-key · press
+            </span>
           </div>
           <div className="flex flex-col gap-2">
             <div className="h-16 rounded-md bg-popover shadow-float" />
-            <span className="font-mono text-[11px] text-muted-foreground">shadow-float · menus</span>
+            <span className="font-mono text-[11px] text-muted-foreground">
+              shadow-float · menus
+            </span>
           </div>
         </div>
       </Panel>
@@ -423,7 +657,10 @@ function DitherSection() {
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {SCENES.map((s) => (
-          <figure key={s.scene} className="overflow-hidden rounded-lg border border-border bg-card">
+          <figure
+            key={s.scene}
+            className="overflow-hidden rounded-lg border border-border bg-card"
+          >
             <div className="h-40 bg-background">
               <DitherField
                 scene={s.scene}
@@ -435,7 +672,9 @@ function DitherSection() {
             </div>
             <figcaption className="flex items-baseline justify-between gap-3 border-t border-hairline px-4 py-3">
               <span className="text-sm font-medium">{s.title}</span>
-              <span className="text-right text-[12px] text-muted-foreground">{s.use}</span>
+              <span className="text-right text-[12px] text-muted-foreground">
+                {s.use}
+              </span>
             </figcaption>
           </figure>
         ))}
@@ -446,7 +685,9 @@ function DitherSection() {
             {["dither-12", "dither-25", "dither-50", "dither-75"].map((d) => (
               <div key={d} className="flex flex-col gap-2">
                 <div className={cn("h-20 rounded-sm bg-ember", d)} />
-                <span className="font-mono text-[11px] text-muted-foreground">{d}</span>
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {d}
+                </span>
               </div>
             ))}
           </div>
@@ -459,7 +700,8 @@ function DitherSection() {
             <div className="flex-1" />
           </div>
           <p className="mt-3 text-[13px] text-muted-foreground">
-            Masks take the element&rsquo;s own background. Step them to dissolve an edge instead of a soft gradient.
+            Masks take the element&rsquo;s own background. Step them to dissolve
+            an edge instead of a soft gradient.
           </p>
         </Panel>
         <Panel label="Halftone & grain">
@@ -468,17 +710,23 @@ function DitherSection() {
             <div className="grain h-28 rounded-sm bg-surface [--grain-opacity:0.18]" />
           </div>
           <p className="mt-3 text-[13px] text-muted-foreground">
-            Halftone in currentColor for logo-like skies. Grain on large paper surfaces only, at 6 to 10 percent.
+            Halftone in currentColor for logo-like skies. Grain on large paper
+            surfaces only, at 6 to 10 percent.
           </p>
         </Panel>
       </div>
       <Panel label="Rules">
         <ul className="grid gap-2 text-sm sm:grid-cols-2">
           <li>One dither field per view. It is atmosphere, not wallpaper.</li>
-          <li>Dither pixel is 2 to 4 CSS px. Larger reads as retro, smaller as noise.</li>
+          <li>
+            Dither pixel is 2 to 4 CSS px. Larger reads as retro, smaller as
+            noise.
+          </li>
           <li>Palettes come from tokens, so fields follow the theme.</li>
           <li>Animate only while the agent works. Respect reduced motion.</li>
-          <li>Never put body text directly on a dense field. Use a solid scrim.</li>
+          <li>
+            Never put body text directly on a dense field. Use a solid scrim.
+          </li>
           <li>Thumbnails dither; the live game preview never does.</li>
         </ul>
       </Panel>
@@ -530,7 +778,8 @@ function ControlsSection() {
           </div>
         </div>
         <p className="mt-5 text-[13px] text-muted-foreground">
-          Ember presses down 2px onto its key shadow. Ink darkens on hover. Focus is a 2px ember ring offset by 2px.
+          Ember presses down 2px onto its key shadow. Ink darkens on hover.
+          Focus is a 2px ember ring offset by 2px.
         </p>
       </Panel>
       <div className="grid gap-4 md:grid-cols-2">
@@ -605,11 +854,15 @@ function StatesSection() {
             </span>
           </div>
           <div className="flex flex-col gap-2">
-            <span className="label-pixel text-muted-foreground">Compiling scene · 64%</span>
+            <span className="label-pixel text-muted-foreground">
+              Compiling scene · 64%
+            </span>
             <DitherProgress value={64} />
           </div>
           <div className="flex flex-col gap-2">
-            <span className="label-pixel text-muted-foreground">Starting sandbox</span>
+            <span className="label-pixel text-muted-foreground">
+              Starting sandbox
+            </span>
             <DitherProgress />
           </div>
           <div className="flex flex-col gap-2">
@@ -621,7 +874,17 @@ function StatesSection() {
       </Panel>
       <Panel label="Agent working (preview area)">
         <div className="relative h-56 overflow-hidden rounded-lg bg-night">
-          <DitherField scene="forge" animated pixel={4} palette={["--color-night", "--color-ember-900", "--ember", "--color-ember-200"]} />
+          <DitherField
+            scene="forge"
+            animated
+            pixel={4}
+            palette={[
+              "--color-night",
+              "--color-ember-900",
+              "--ember",
+              "--color-ember-200",
+            ]}
+          />
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-night/85 px-4 py-3 text-bone">
             <span className="flex items-center gap-2 text-sm">
               <Spark size={14} twinkle /> Forging your world
@@ -633,11 +896,21 @@ function StatesSection() {
       <Panel label="Empty">
         <div className="relative flex h-64 flex-col items-center justify-start overflow-hidden rounded-lg border border-dashed border-border pt-7 text-center">
           <div className="absolute inset-x-0 bottom-0 h-14">
-            <DitherField scene="clouds" pixel={3} palette={["transparent", "--dither-mid"]} seed={2} bias={-0.1} />
+            <DitherField
+              scene="clouds"
+              pixel={3}
+              palette={["transparent", "--dither-mid"]}
+              seed={2}
+              bias={-0.1}
+            />
           </div>
           <Spark size={28} className="relative" />
-          <p className="relative mt-4 font-display text-display-sm">No games yet</p>
-          <p className="relative mt-1 max-w-xs text-sm text-muted-foreground">Describe one sentence of a world and the forge does the rest.</p>
+          <p className="relative mt-4 font-display text-display-sm">
+            No games yet
+          </p>
+          <p className="relative mt-1 max-w-xs text-sm text-muted-foreground">
+            Describe one sentence of a world and the forge does the rest.
+          </p>
           <Button variant="ember" size="sm" className="relative mt-5">
             Forge your first game
           </Button>
@@ -649,9 +922,12 @@ function StatesSection() {
             <span className="label-pixel flex items-center gap-2 text-destructive">
               <TriangleAlert className="size-3.5" /> Runtime error
             </span>
-            <p className="mt-3 font-display text-display-sm">The game crashed on load.</p>
+            <p className="mt-3 font-display text-display-sm">
+              The game crashed on load.
+            </p>
             <pre className="mt-3 overflow-x-auto rounded-sm bg-background/70 p-3 font-mono text-[12px] text-muted-foreground">
-              TypeError: player.mesh is undefined{"\n"}  at update (src/game/player.ts:42)
+              TypeError: player.mesh is undefined{"\n"} at update
+              (src/game/player.ts:42)
             </pre>
           </div>
           <div className="flex gap-2">
@@ -674,16 +950,24 @@ function NightSection() {
   return (
     <div className="dark overflow-hidden rounded-xl border border-border bg-background text-foreground">
       <div className="relative h-40">
-        <DitherField scene="sun" pixel={3} seed={9} palette={["--color-night", "--color-ember-900", "--ember"]} />
+        <DitherField
+          scene="sun"
+          pixel={3}
+          seed={9}
+          palette={["--color-night", "--color-ember-900", "--ember"]}
+        />
       </div>
       <div className="grid gap-8 p-6 md:grid-cols-2">
         <div>
-          <span className="label-pixel text-ember-text">Night · tokens flip</span>
+          <span className="label-pixel text-ember-text">
+            Night · tokens flip
+          </span>
           <p className="mt-3 font-display text-display-md">
             The forge, <em className="text-ember">after dark.</em>
           </p>
           <p className="mt-3 max-w-sm text-sm text-muted-foreground">
-            Night is for the workspace, where the game preview needs a dark frame. Paper is for reading, auth and settings.
+            Night is for the workspace, where the game preview needs a dark
+            frame. Paper is for reading, auth and settings.
           </p>
         </div>
         <div className="flex flex-col gap-3">
@@ -703,6 +987,92 @@ function NightSection() {
           </div>
           <DitherProgress value={38} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* --- 09 Product ---------------------------------------------------------- */
+
+function ProductSection() {
+  return (
+    <div className="flex flex-col gap-4">
+      <Panel label="Status chips (on covers)">
+        <div className="dark flex flex-wrap gap-2 rounded-md bg-night p-4">
+          <GameStatusChip status="ready" version={4} />
+          <GameStatusChip status="building" version={2} />
+          <GameStatusChip status="error" version={3} />
+          <GameStatusChip status="draft" />
+        </div>
+      </Panel>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Panel label="Game cover · generated before first screenshot">
+          <div className="grid grid-cols-2 gap-3">
+            {[10, 2, 23, 31].map((seed) => (
+              <GameCover
+                key={seed}
+                title="Sample"
+                seed={seed}
+                className="aspect-[16/10] rounded-md"
+              />
+            ))}
+          </div>
+        </Panel>
+        <Panel label="Sparks meter (sidebar)">
+          <div className="rounded-md bg-sidebar p-2">
+            <SparksMeter used={1280} allowance={2000} />
+            <SparksMeter used={1840} allowance={2000} />
+          </div>
+          <p className="mt-3 text-[13px] text-muted-foreground">
+            Count turns ember-text at 85% used.
+          </p>
+        </Panel>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Panel label="Agent work log">
+          <div className="flex flex-col gap-3">
+            <ToolLog
+              parts={[
+                {
+                  type: "tool",
+                  id: "a",
+                  tool: "read_file",
+                  path: "src/game/sentinels.ts",
+                  state: "done",
+                },
+                {
+                  type: "tool",
+                  id: "b",
+                  tool: "replace_text",
+                  path: "src/game/sentinels.ts",
+                  state: "done",
+                  added: 2,
+                  removed: 2,
+                },
+                {
+                  type: "tool",
+                  id: "c",
+                  tool: "write_file",
+                  path: "src/game/health.ts",
+                  state: "running",
+                  added: 38,
+                },
+              ]}
+            />
+            <Checkpoint
+              part={{
+                type: "checkpoint",
+                version: 2,
+                label: "Faster sentinels, health",
+              }}
+            />
+          </div>
+        </Panel>
+        <Panel label="Game brief">
+          <BriefCard
+            part={{ type: "brief", brief: DEMO_BRIEF, status: "approved" }}
+          />
+        </Panel>
       </div>
     </div>
   );

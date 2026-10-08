@@ -3,7 +3,7 @@ import { SignIn } from "@clerk/nextjs";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { authAppearance } from "@/components/auth/clerk-appearance";
 
-export const metadata: Metadata = { title: "Sign in · GameSmith" };
+export const metadata: Metadata = { title: "Sign in" };
 
 export default function SignInPage() {
   return (

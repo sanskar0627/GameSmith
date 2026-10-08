@@ -11,8 +11,8 @@ type Props = { params: Promise<{ gameId: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const game = getDemoGame((await params).gameId);
   return game && game.visibility === "link"
-    ? { title: `${game.title} · Play on GameSmith`, description: game.pitch }
-    : { title: "Game not found · GameSmith" };
+    ? { title: `${game.title} · Play`, description: game.pitch, openGraph: { title: game.title, description: game.pitch } }
+    : { title: "Game not found" };
 }
 
 /**
@@ -26,7 +26,7 @@ export default async function PlayPage({ params }: Props) {
   if (!game || game.visibility !== "link") notFound();
 
   return (
-    <main className="dark flex h-dvh flex-col bg-background text-foreground">
+    <main id="main" className="dark flex h-dvh flex-col bg-background text-foreground">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-hairline px-3 sm:px-4">
         <Link href="/" aria-label="GameSmith home" className="shrink-0 rounded-sm">
           <Wordmark height={15} />

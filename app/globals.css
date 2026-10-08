@@ -214,7 +214,7 @@
   --ember: #e4663a;
   --ember-foreground: #1c1b19; /* ink on ember: 5.1:1 */
   --ember-text: #b83f16; /* ember as text on paper: 5.1:1 */
-  --ember-soft: #fbe1d3;
+  --ember-soft: #fde9df; /* ember-text on it: 4.76:1 */
 
   --destructive: #b3261e;
   --success: #3f6b47;
@@ -273,7 +273,7 @@
   --ember-text: #ea8158; /* 6.0:1 on night */
   --ember-soft: #2e1a12;
 
-  --destructive: #e5534b;
+  --destructive: #f47c74; /* >= 4.78:1 on its own tints over night */
   --success: #7fae86;
 
   --border: rgb(243 238 226 / 0.1);
