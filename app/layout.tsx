@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import type { Viewport } from "next";
 import { Geist, Geist_Mono, Geist_Pixel, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import { ThemeScript } from "@/components/theme/theme-script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,8 +46,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      // ThemeScript sets the `dark` class before hydration.
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${geistPixel.variable} h-full antialiased`}
     >
+      <head>
+        <ThemeScript />
+      </head>
       <body className="min-h-full flex flex-col">
         <ClerkProvider
           appearance={{ theme: shadcn }}
