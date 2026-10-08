@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { Wordmark } from "@/components/brand/wordmark";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 /**
  * Public header (landing, marketing). The signed-in app gets its own shell.
@@ -27,6 +27,9 @@ export function SiteHeader() {
             </SignUpButton>
           </Show>
           <Show when="signed-in">
+            <Link href="/games" className={buttonVariants({ variant: "ember", size: "sm" })}>
+              Open GameSmith
+            </Link>
             <UserButton />
           </Show>
         </nav>
