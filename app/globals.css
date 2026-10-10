@@ -77,6 +77,7 @@
   --animate-forge-glow: forge-glow 2.4s steps(6, end) infinite;
   --animate-caret: caret 1s steps(1, end) infinite;
   --animate-skeleton: skeleton-step 1.6s steps(1, end) infinite;
+  --animate-hint-out: hint-out 0.5s steps(4, end) 4s forwards;
 
   @keyframes pixel-blink {
     0%,
@@ -100,6 +101,12 @@
     }
     50% {
       box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-ember-500) 22%, transparent);
+    }
+  }
+  @keyframes hint-out {
+    to {
+      opacity: 0;
+      visibility: hidden;
     }
   }
   @keyframes skeleton-step {
