@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** Monthly sparks at a glance. Turns ember-text when nearly spent. */
-export function SparksMeter({ used, allowance }: { used: number; allowance: number }) {
+/**
+ * This period's allowance at a glance. Turns ember-text when nearly spent.
+ * `extra` is pack sparks (never expire), shown below when there are any.
+ */
+export function SparksMeter({ used, allowance, extra = 0 }: { used: number; allowance: number; extra?: number }) {
   const pct = Math.min(100, Math.round((used / Math.max(1, allowance)) * 100));
   const low = pct >= 85;
   return (
@@ -15,11 +18,14 @@ export function SparksMeter({ used, allowance }: { used: number; allowance: numb
         <span className={cn("font-pixel text-[11px] tabular-nums", low ? "text-ember-text" : "text-muted-foreground")}>
           {used.toLocaleString("en-US")} / {allowance.toLocaleString("en-US")}
         </span>
-        <span className="sr-only"> used this month. View usage and billing.</span>
+        <span className="sr-only"> used this period. View usage and billing.</span>
       </span>
       <span className="mt-1.5 block h-1 overflow-hidden rounded-[1px] bg-sidebar-accent">
         <span className="block h-full bg-ember" style={{ width: `${pct}%` }} />
       </span>
+      {extra > 0 && (
+        <span className="mt-1 block text-[11px] text-muted-foreground">+{extra.toLocaleString("en-US")} pack sparks</span>
+      )}
     </Link>
   );
 }

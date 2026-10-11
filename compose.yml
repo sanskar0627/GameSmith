@@ -1,0 +1,32 @@
+
+#   npm run db:up      start Postgres and wait until it is healthy
+#   npm run db:down    stop it (data is kept in the `pgdata` volume)
+#
+# The password comes from POSTGRES_PASSWORD in .env.local (the npm scripts
+# pass that file to Compose). Nothing secret is stored in this file.
+name: gamesmith
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gamesmith
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.local (see .env.example)}
+      POSTGRES_DB: gamesmith
+    ports:
+      # Bound to localhost only: never expose Postgres on a public interface.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/<major>/,
+      # so the volume mounts the parent directory (not .../data).
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamesmith -d gamesmith"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

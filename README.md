@@ -13,6 +13,8 @@ GameSmith is under active development. Authentication, the public landing experi
 - [Next.js](https://nextjs.org/) 16 with the App Router
 - [React](https://react.dev/) 19 and TypeScript
 - [Clerk](https://clerk.com/) for authentication
+- [AI SDK](https://ai-sdk.dev/) 7 with Anthropic, OpenAI, OpenRouter and Fal providers
+- [PostgreSQL](https://www.postgresql.org/) 18 with [Drizzle ORM](https://orm.drizzle.team/)
 - [Tailwind CSS](https://tailwindcss.com/) 4 with custom design tokens
 - [shadcn/ui](https://ui.shadcn.com/) and Base UI primitives
 - [Lucide](https://lucide.dev/) for interface icons
@@ -20,8 +22,9 @@ GameSmith is under active development. Authentication, the public landing experi
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 22.12 or newer
 - npm
+- Docker (for the local Postgres database)
 - A Clerk application for local authentication
 
 ## Getting Started
@@ -34,23 +37,27 @@ cd GameSmith
 npm install
 ```
 
-Create a local environment file:
+Create a local environment file from the template and add the keys from your Clerk dashboard:
 
 ```bash
-touch .env.local
+cp .env.example .env.local
 ```
 
-Add the keys from your Clerk dashboard to `.env.local`:
+Generate the key that encrypts users' saved API keys and put it in `KEY_ENCRYPTION_KEYS` (optional locally, where a fixed development key is used with a warning; required in production):
 
-```env
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
+```bash
+node -e "console.log('1:' + require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-`NEXT_PUBLIC_APP_URL` is optional during local development. Set it to the deployed origin when generating production metadata and share URLs:
+To offer models paid with sparks, set the `PLATFORM_*` provider keys. Without them, users can still run models with their own keys (Settings > API keys).
 
-```env
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+Choose a password for the local database and put it in `.env.local` as `POSTGRES_PASSWORD` (any random string; `openssl rand -hex 16` works). Compose, the app and the tests all read it from there, so no password is committed.
+
+Start Postgres and apply the database migrations:
+
+```bash
+npm run db:up
+npm run db:migrate
 ```
 
 Start the development server:
@@ -59,7 +66,7 @@ Start the development server:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser. Signing in creates your user row on first visit; `GET /api/health` reports whether the app can reach the database.
 
 ## Available Scripts
 
@@ -67,6 +74,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | --- | --- |
 | `npm run dev` | Start the development server with hot reload |
 | `npm run lint` | Run ESLint across the project |
+| `npm run typecheck` | Type-check the project |
+| `npm test` | Run the test suite against the `gamesmith_test` database |
+| `npm run db:up` / `db:down` | Start or stop the local Postgres container |
+| `npm run db:generate` | Write a SQL migration after changing `lib/db/schema.ts` |
+| `npm run db:migrate` | Apply pending migrations |
+| `npm run db:studio` | Browse the database in Drizzle Studio |
 | `npm run build` | Create a production build |
 | `npm run start` | Serve the production build locally |
 
@@ -79,14 +92,21 @@ app/
 	(app)/              Protected game workspace
 	play/               Playable game routes
 	design-system/      Development-only component and token preview
+	api/                Route handlers (health, webhooks)
 components/
 	app/                Workspace UI and product features
 	auth/               Authentication branding components
 	dither/             Dither rendering and procedural scene utilities
 	settings/           Account and billing settings UI
 	ui/                 Shared interface primitives
+docs/
+	architecture.md     Architecture decisions and the phased delivery plan
+drizzle/              SQL migrations (generated, committed)
 lib/
 	auth.ts             Server-side authentication boundaries
+	db/                 Drizzle client and schema
+	server/             Server-only data access (users, game access, webhooks)
+tests/                Vitest integration tests (real Postgres)
 public/               Static assets and standalone previews
 proxy.ts              Clerk request middleware
 ```
@@ -98,7 +118,26 @@ Clerk middleware attaches authentication state to requests, but it is not the au
 - `requireUser()` redirects signed-out visitors to Clerk sign-in.
 - `requireApiUser()` throws an unauthorized error for API and server-action flows.
 
-When adding protected resources, validate both authentication and resource ownership at the point where the resource is accessed.
+When adding protected resources, validate both authentication and resource ownership at the point where the resource is accessed. For games, use `requireGameAccess(gameId, "read" | "write")` from [`lib/server/games/access.ts`](lib/server/games/access.ts); it reports every denial as "not found".
+
+### Provider keys (BYOK)
+
+Users can save their own Anthropic, OpenAI, OpenRouter and Fal keys in Settings > API keys. A key is checked with a free provider request, encrypted with AES-256-GCM (bound to the user and provider) and stored in `provider_keys`; only its last 4 characters are ever shown. Plaintext keys stay on the server: see [`lib/server/keys.ts`](lib/server/keys.ts) and [`lib/server/ai/access.ts`](lib/server/ai/access.ts). The model catalog and prices live in [`lib/ai/models.ts`](lib/ai/models.ts).
+
+To rotate the encryption key, put a new entry first in `KEY_ENCRYPTION_KEYS` and keep the old one after it (`2:<new>,1:<old>`). Saved keys are re-encrypted as they are next used.
+
+### Sparks and payments
+
+Agent work is paid in sparks (see [`lib/billing/pricing.ts`](lib/billing/pricing.ts) for plans, packs and the spark rate). Each user has a wallet with a monthly allowance and pack sparks; every change is a row in the append-only `spark_ledger`, written in the same transaction and keyed for idempotency. A run holds sparks when it starts and settles actual usage when it ends ([`lib/server/billing/runs.ts`](lib/server/billing/runs.ts)).
+
+Payments go through [Polar](https://polar.sh). Create one product per offer (Forge and Studio monthly subscriptions, two sparks packs), put their ids and an organization access token in the `POLAR_*` variables, and add a webhook to `<app url>/api/webhooks/polar` for `order.paid`, `order.refunded` and the `subscription.*` events. Sparks are only granted by the verified webhook. Use `POLAR_SERVER=sandbox` until you go live.
+
+### User sync
+
+User rows are kept in sync two ways:
+
+- **Webhook:** `POST /api/webhooks/clerk` handles `user.created`, `user.updated` and `user.deleted`. In the Clerk dashboard, add an endpoint for those events and put its signing secret in `CLERK_WEBHOOK_SIGNING_SECRET`.
+- **On first visit:** the app layout calls `ensureUser()`, which creates the row if the webhook has not arrived yet (or cannot reach your machine during local development).
 
 ## Design System
 
@@ -112,7 +151,8 @@ The standalone preview at [`public/preview-demo.html`](public/preview-demo.html)
 - Reuse shared components from `components/ui` before introducing new primitives.
 - Preserve the established Ember on Bone typography, spacing, color, and focus styles.
 - Keep user-facing routes accessible with keyboard navigation and visible focus states.
-- Run `npm run lint` before opening a pull request.
+- Run `npm run lint`, `npm run typecheck` and `npm test` before opening a pull request.
+- Change the schema in `lib/db/schema.ts`, then run `npm run db:generate` and commit the migration.
 
 ## Deployment
 
@@ -123,7 +163,7 @@ npm run build
 npm run start
 ```
 
-For a hosted deployment, configure the Clerk production keys and set `NEXT_PUBLIC_APP_URL` to the final HTTPS origin. Vercel is a natural deployment target for this Next.js application.
+Production runs on a self-managed VM with Docker Compose (Postgres, Redis, the app, the agent worker and isolated sandboxes). See [`docs/architecture.md`](docs/architecture.md) for the plan; the deployment runbook arrives in Phase 12.
 
 ## License
 

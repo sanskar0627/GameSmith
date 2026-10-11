@@ -60,7 +60,7 @@ export function GameCard({
             {game.pitch}
           </p>
           <p className="label-pixel mt-2.5 text-muted-foreground">
-            {game.genre} ·{" "}
+            {game.genre && <>{game.genre} · </>}
             <time dateTime={game.updatedAt} suppressHydrationWarning>
               {timeAgo(game.updatedAt)}
             </time>

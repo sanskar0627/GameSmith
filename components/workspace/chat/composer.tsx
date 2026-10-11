@@ -15,6 +15,8 @@ type ComposerProps = {
   crash?: RuntimeError;
   onSend: (text: string, attachments?: Attachment[]) => void;
   onStop: () => void;
+  /** Extra controls beside Attach, e.g. the model picker. */
+  tools?: ReactNode;
 };
 
 /**
@@ -22,7 +24,7 @@ type ComposerProps = {
  * works, Send becomes Stop. A crash is attached automatically (removable).
  */
 export const Composer = forwardRef<HTMLTextAreaElement, ComposerProps>(function Composer(
-  { activity, hasMessages, crash, onSend, onStop },
+  { activity, hasMessages, crash, onSend, onStop, tools },
   ref,
 ) {
   const [value, setValue] = useState("");
@@ -90,9 +92,12 @@ export const Composer = forwardRef<HTMLTextAreaElement, ComposerProps>(function 
             className="field-sizing-content max-h-48 min-h-11 resize-none border-0 bg-transparent px-2.5 py-2 text-[15px] shadow-none focus-visible:ring-0 dark:bg-transparent"
           />
           <div className="flex items-center justify-between gap-2 px-0.5">
-            <Button type="button" variant="ghost" size="icon-sm" aria-label="Attach (coming soon)" disabled>
-              <Plus />
-            </Button>
+            <span className="flex min-w-0 items-center gap-0.5">
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Attach (coming soon)" disabled>
+                <Plus />
+              </Button>
+              {tools}
+            </span>
             {busy ? (
               <Button type="button" variant="outline" size="sm" onClick={onStop}>
                 <Square className="fill-current" data-icon="inline-start" /> Stop

@@ -5,28 +5,23 @@ import { WelcomeDialog } from "@/components/app/welcome-dialog";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { requireUser } from "@/lib/auth";
-import { demoUsage } from "@/lib/billing/mock";
-import { DEMO_GAMES } from "@/lib/games/mock";
 import type { GameSummary } from "@/lib/games/types";
+import { getUsageSummary } from "@/lib/server/billing/summary";
+import { listRecentGames, toGameSummary } from "@/lib/server/games/queries";
+import { ensureUser } from "@/lib/server/users";
 
 /**
  * Signed-in app shell. Auth is checked here for every page in the group,
- * and again at each data access once games are persisted.
+ * and again at each data access once games are persisted. `ensureUser`
+ * redirects signed-out visitors and creates the user's row on first visit.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  await requireUser();
+  const user = await ensureUser();
   // Restore the sidebar's open/collapsed state without a layout jump.
   const sidebarOpen = (await cookies()).get("sidebar_state")?.value !== "false";
-  // TODO(data): load the user's 5 most recently edited games.
-  const recentGames: GameSummary[] = [...DEMO_GAMES]
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-    .slice(0, 5)
-    .map(({ id, title, status, updatedAt, thumbnailUrl }) => ({ id, title, status, updatedAt, thumbnailUrl }));
-
-  // TODO(data): the user's metered usage for this billing cycle.
-  const { used, allowance } = demoUsage();
-  const sparks = { used, allowance };
+  const [recent, usage] = await Promise.all([listRecentGames(user.id), getUsageSummary(user.id)]);
+  const recentGames: GameSummary[] = recent.map(toGameSummary);
+  const sparks = { used: usage.used, allowance: usage.allowance, extra: usage.purchased };
 
   return (
     <TooltipProvider>

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { currentUser } from "@clerk/nextjs/server";
 import { ArrowUp, Check, Code2, History, Share2 } from "lucide-react";
+import { MadeBy } from "@/components/brand/made-by";
 import { Spark } from "@/components/brand/spark";
 import { Wordmark } from "@/components/brand/wordmark";
 import { DitherField } from "@/components/dither/dither-field";
@@ -9,14 +10,14 @@ import { GameCover } from "@/components/games/game-cover";
 import { GameStatusChip } from "@/components/games/game-status";
 import { AuthCta } from "@/components/landing/auth-cta";
 import { Kbd } from "@/components/ui/kbd";
-import { DEMO_FILES, DEMO_GAMES } from "@/lib/games/mock";
+import { DEMO_FILES, SHOWCASE_GAMES } from "@/lib/games/mock";
 
 const NIGHT_PALETTE = ["--dither-ink", "--color-ember-900", "--ember", "--color-ember-200"];
 
 export default async function Home() {
   const user = await currentUser();
-  // TODO(data): featured public games.
-  const showcase = DEMO_GAMES.filter((g) => g.visibility === "link").slice(0, 3);
+  // Curated showcase (fixtures in lib/games/mock.ts), not users' games.
+  const showcase = SHOWCASE_GAMES;
   const snippet = DEMO_FILES[0].content.split("\n").slice(6, 23).join("\n");
 
   return (
@@ -131,7 +132,13 @@ export default async function Home() {
               <span className="font-mono text-[12.5px]">src/main.ts</span>
               <span className="label-pixel ml-auto text-muted-foreground">Written by Smith</span>
             </figcaption>
-            <pre className="overflow-x-auto px-4 py-4 font-mono text-[12.5px] leading-[1.7] text-foreground">
+            {/* Focusable so keyboard users can scroll the code sideways on small screens. */}
+            <pre
+              tabIndex={0}
+              role="region"
+              aria-label="Example game source code"
+              className="overflow-x-auto px-4 py-4 font-mono text-[12.5px] leading-[1.7] text-foreground"
+            >
               <code>{snippet}</code>
             </pre>
           </figure>
@@ -193,8 +200,11 @@ export default async function Home() {
           </div>
         </div>
         <footer className="border-t border-white/10 bg-night/80 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-8">
-            <Wordmark height={15} />
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 text-left sm:flex-row sm:items-end sm:justify-between sm:px-8">
+            <div className="flex flex-col gap-3">
+              <Wordmark height={15} />
+              <MadeBy />
+            </div>
             <span className="label-pixel text-muted-foreground">&copy; {new Date().getFullYear()} GameSmith</span>
           </div>
         </footer>

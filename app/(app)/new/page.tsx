@@ -2,12 +2,17 @@ import type { Metadata } from "next";
 import { NewGameComposer } from "@/components/app/new-game-composer";
 import { PageHeader } from "@/components/app/page-header";
 import { Spark } from "@/components/brand/spark";
+import { pickInitialModel } from "@/lib/ai/models";
+import { listModelOptions } from "@/lib/server/ai/access";
+import { ensureUser } from "@/lib/server/users";
 
 export const metadata: Metadata = { title: "New game" };
 
 export default async function NewGamePage({ searchParams }: { searchParams: Promise<{ prompt?: string | string[] }> }) {
   const { prompt } = await searchParams;
   const initial = typeof prompt === "string" ? prompt.slice(0, 2000) : "";
+  const user = await ensureUser();
+  const models = await listModelOptions(user.id);
 
   return (
     <>
@@ -21,7 +26,7 @@ export default async function NewGamePage({ searchParams }: { searchParams: Prom
           <p className="mt-3 mb-8 max-w-md text-[15px] text-muted-foreground">
             Describe the world, the goal, and what makes it hard. You can change anything after.
           </p>
-          <NewGameComposer initialPrompt={initial} />
+          <NewGameComposer initialPrompt={initial} models={models} initialModel={pickInitialModel(models)} />
         </div>
       </div>
     </>

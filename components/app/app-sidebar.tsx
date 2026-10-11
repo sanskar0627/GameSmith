@@ -32,7 +32,7 @@ const NAV = [
 const navItemClass =
   "relative data-active:bg-sidebar-accent data-active:font-medium before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-ember before:opacity-0 data-active:before:opacity-100 group-data-[collapsible=icon]:before:hidden";
 
-export function AppSidebar({ games, sparks }: { games: GameSummary[]; sparks: { used: number; allowance: number } }) {
+export function AppSidebar({ games, sparks }: { games: GameSummary[]; sparks: { used: number; allowance: number; extra?: number } }) {
   const pathname = usePathname();
 
   return (
