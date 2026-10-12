@@ -1,6 +1,7 @@
 
 #   npm run db:up      start Postgres and wait until it is healthy
 #   npm run db:down    stop it (data is kept in the `pgdata` volume)
+#   npm run sandbox:build / sandbox:up   game sandboxes (see sandbox/README.md)
 #
 # The password comes from POSTGRES_PASSWORD in .env.local (the npm scripts
 # pass that file to Compose). Nothing secret is stored in this file.
@@ -28,5 +29,80 @@ services:
       timeout: 3s
       retries: 20
 
+  # Queues and live agent events (used from Phase 9). Local only.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command: ["sh", "-c", 'test -n "$$REDIS_PASSWORD" || { echo "Set REDIS_PASSWORD in .env.local"; exit 1; }; exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" --no-auth-warning ping | grep -q PONG']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # --- Game sandboxes (npm run sandbox:build, then npm run sandbox:up) ---
+
+  # The per-game sandbox image. Build-only: the manager runs one container per game.
+  sandbox-image:
+    image: gamesmith-sandbox:latest
+    build: ./sandbox/template
+    profiles: ["build"]
+
+  # Starts and stops sandboxes. The only service with the Docker socket.
+  # Not reachable from sandboxes: they never join this service's network.
+  sandbox-manager:
+    image: gamesmith-sandbox-manager:latest
+    build: ./sandbox/manager
+    container_name: gamesmith-sandbox-manager
+    profiles: ["sandbox"]
+    restart: unless-stopped
+    environment:
+      SANDBOX_MANAGER_TOKEN: ${SANDBOX_MANAGER_TOKEN:-}
+      # Docker Desktop has no gVisor, so local development uses runc.
+      # The VM sets runsc (and SANDBOX_REQUIRE_GVISOR=true).
+      SANDBOX_RUNTIME: ${SANDBOX_RUNTIME:-runc}
+      SANDBOX_REQUIRE_GVISOR: ${SANDBOX_REQUIRE_GVISOR:-false}
+      SANDBOX_IMAGE: gamesmith-sandbox:latest
+      PROXY_CONTAINER: gamesmith-sandbox-proxy
+      PREVIEW_PUBLIC_PORT: "4101"
+      SNAPSHOTS_DIR: /data/snapshots
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - snapshots:/data/snapshots
+    ports:
+      - "127.0.0.1:4100:4100"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4100/healthz >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Serves previews. Joins each sandbox's private network; no Docker access.
+  sandbox-proxy:
+    image: gamesmith-sandbox-manager:latest
+    container_name: gamesmith-sandbox-proxy
+    profiles: ["sandbox"]
+    restart: unless-stopped
+    user: node
+    command: ["node", "dist/proxy-main.js"]
+    environment:
+      SANDBOX_MANAGER_TOKEN: ${SANDBOX_MANAGER_TOKEN:-}
+      MANAGER_URL: http://sandbox-manager:4100
+      APP_ORIGIN: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      PREVIEW_PORT: "4101"
+    ports:
+      - "127.0.0.1:4101:4101"
+    depends_on:
+      sandbox-manager:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  redisdata:
+  snapshots:

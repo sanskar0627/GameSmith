@@ -42,3 +42,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .clerk/
+
+# sandbox service and game template (installed/built locally)
+/sandbox/manager/node_modules
+/sandbox/manager/dist
+/sandbox/template/files/node_modules
+/sandbox/template/files/dist
+/sandbox/template/files/.vite

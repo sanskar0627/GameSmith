@@ -11,10 +11,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:up": "docker compose --env-file .env.local up -d --wait postgres",
-    "db:down": "docker compose --env-file .env.local down",
+    "db:down": "docker compose --env-file .env.local --profile sandbox down",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "redis:up": "docker compose --env-file .env.local up -d --wait redis",
+    "sandbox:install": "npm --prefix sandbox/manager ci && npm --prefix sandbox/template/files ci",
+    "sandbox:test": "npm --prefix sandbox/manager test",
+    "sandbox:build": "docker compose --env-file .env.local --profile build --profile sandbox build sandbox-image sandbox-manager",
+    "sandbox:up": "docker compose --env-file .env.local --profile sandbox up -d --wait sandbox-manager sandbox-proxy",
+    "sandbox:down": "docker compose --env-file .env.local --profile sandbox stop sandbox-manager sandbox-proxy",
+    "sandbox:smoke": "node --env-file=.env.local sandbox/smoke.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.78",

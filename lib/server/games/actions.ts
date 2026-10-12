@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { isModelId } from "@/lib/ai/models";
 import type { GameCard, GameVisibility } from "@/lib/games/types";
+import { copyGameFiles } from "@/lib/server/sandbox/service";
 import { ensureUser } from "@/lib/server/users";
 
 import { GameNotFoundError } from "./access";
@@ -91,7 +92,9 @@ export async function restoreGameAction(id: string): Promise<ActionResult<GameCa
 
 export async function duplicateGameAction(id: string): Promise<ActionResult<GameCard>> {
   return run("duplicate", async (userId) => {
-    const game = await duplicateGame(userId, gameId.parse(id));
+    const source = gameId.parse(id);
+    const game = await duplicateGame(userId, source);
+    await copyGameFiles(source, game.id);
     refresh();
     return toGameCard(game);
   });

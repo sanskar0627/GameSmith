@@ -132,6 +132,10 @@ Agent work is paid in sparks (see [`lib/billing/pricing.ts`](lib/billing/pricing
 
 Payments go through [Polar](https://polar.sh). Create one product per offer (Forge and Studio monthly subscriptions, two sparks packs), put their ids and an organization access token in the `POLAR_*` variables, and add a webhook to `<app url>/api/webhooks/polar` for `order.paid`, `order.refunded` and the `subscription.*` events. Sparks are only granted by the verified webhook. Use `POLAR_SERVER=sandbox` until you go live.
 
+### Game sandboxes
+
+Each game runs in its own isolated container with a live preview. The app reaches them through the sandbox manager; see [`sandbox/README.md`](sandbox/README.md) for the security model, local setup (`npm run sandbox:build`, `sandbox:up`, `sandbox:smoke`) and the gVisor setup for the VM. Owner-only routes: `POST/GET/DELETE /api/games/:id/sandbox`, `GET /api/games/:id/files`, and `GET/PUT/DELETE /api/games/:id/files/<path>`.
+
 ### User sync
 
 User rows are kept in sync two ways:
