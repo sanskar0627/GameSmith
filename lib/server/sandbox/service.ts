@@ -68,6 +68,14 @@ function client(): SandboxClient {
   return new SandboxClient(env.SANDBOX_MANAGER_URL, env.SANDBOX_MANAGER_TOKEN);
 }
 
+/**
+ * The manager client for an agent run. No ownership check here: the run was
+ * created for the game's owner (lib/server/agent/service.ts).
+ */
+export function runSandbox(): SandboxClient {
+  return client();
+}
+
 export function sandboxesConfigured(): boolean {
   const env = serverEnv();
   return Boolean(override || (env.SANDBOX_MANAGER_URL && env.SANDBOX_MANAGER_TOKEN));
