@@ -3,6 +3,7 @@ import "server-only";
 import { UnauthorizedError } from "@/lib/auth";
 import { GameNotFoundError } from "@/lib/server/games/access";
 
+import { ArchiveError } from "./archive";
 import { SandboxError } from "./client";
 import { SandboxNotConfiguredError } from "./service";
 
@@ -21,6 +22,10 @@ export function sandboxErrorResponse(error: unknown): Response {
       return Response.json({ error: "The sandbox had a problem. Try again." }, { status });
     }
     return Response.json({ error: error.message }, { status: error.status });
+  }
+  if (error instanceof ArchiveError) {
+    console.error("[sandbox] archive", error.message);
+    return Response.json({ error: error.message }, { status: 422 });
   }
   console.error("[sandbox] unexpected error", error);
   return Response.json({ error: "Something went wrong." }, { status: 500 });

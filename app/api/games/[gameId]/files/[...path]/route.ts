@@ -1,6 +1,8 @@
+import { z } from "zod";
+
 import { requireApiUser } from "@/lib/auth";
 import { noStore, sandboxErrorResponse } from "@/lib/server/sandbox/http";
-import { deleteGameFile, MAX_FILE_BYTES, readGameFile, writeGameFile } from "@/lib/server/sandbox/service";
+import { deleteGameFile, MAX_FILE_BYTES, readGameFile, renameGameFile, writeGameFile } from "@/lib/server/sandbox/service";
 
 type Ctx = { params: Promise<{ gameId: string; path: string[] }> };
 
@@ -50,6 +52,22 @@ export async function DELETE(_request: Request, ctx: Ctx) {
     const { gameId, path } = await target(ctx);
     await deleteGameFile(userId, gameId, path);
     return Response.json({ ok: true }, { headers: noStore });
+  } catch (error) {
+    return sandboxErrorResponse(error);
+  }
+}
+
+const renameBody = z.object({ to: z.string().min(1).max(512) });
+
+/** Renames (moves) one file: `{ "to": "src/new-name.ts" }`. */
+export async function PATCH(request: Request, ctx: Ctx) {
+  try {
+    const { userId } = await requireApiUser();
+    const { gameId, path } = await target(ctx);
+    const body = renameBody.safeParse(await request.json().catch(() => null));
+    if (!body.success) return Response.json({ error: "Send the new path as { to }." }, { status: 400 });
+    const moved = await renameGameFile(userId, gameId, path, body.data.to);
+    return Response.json({ ok: true, path: moved }, { headers: noStore });
   } catch (error) {
     return sandboxErrorResponse(error);
   }
