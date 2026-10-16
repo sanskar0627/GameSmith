@@ -49,3 +49,7 @@ next-env.d.ts
 /sandbox/template/files/node_modules
 /sandbox/template/files/dist
 /sandbox/template/files/.vite
+
+# local project notes (not pushed)
+/PROJECT_CONTEXT.md
+/docs/architecture.md
