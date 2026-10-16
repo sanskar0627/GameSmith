@@ -18,6 +18,12 @@ export default defineConfig({
     strictPort: true,
     // The preview proxy forwards the public host name.
     allowedHosts: true,
+    // The app embeds the preview in a sandboxed iframe (no allow-same-origin),
+    // so the page has an opaque origin and the browser sends `Origin: null`
+    // for its module scripts and the HMR socket. Vite only allows localhost
+    // origins by default, which blocks both. The preview URL itself is the
+    // secret, and the sandbox has no network or credentials to protect.
+    cors: true,
     watch: { usePolling: true, interval: 250 },
     hmr: hmrPort ? { clientPort: hmrPort } : undefined,
   },
