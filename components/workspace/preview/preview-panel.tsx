@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState, type ComponentProps, type ReactNode } from "react";
-import { Check, ExternalLink, Maximize2, MousePointerClick, RotateCw, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { Check, Code2, ExternalLink, Maximize2, MousePointerClick, RotateCw, TriangleAlert } from "lucide-react";
 import { PixelLoader, DitherProgress } from "@/components/brand/pixel-loader";
 import { Spark } from "@/components/brand/spark";
 import { DitherField } from "@/components/dither/dither-field";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { BuildState, BuildStep } from "@/lib/workspace/types";
 import { cn } from "@/lib/utils";
@@ -15,12 +16,26 @@ import { cn } from "@/lib/utils";
  *
  * Security: the game runs in a sandboxed iframe WITHOUT allow-same-origin,
  * so it gets an opaque origin and can never read GameSmith cookies or
- * storage. In production the src is the per-game sandbox preview URL on a
- * separate domain; runtime errors arrive via postMessage.
+ * storage. For saved games the src is the game's sandbox preview (a private
+ * capability URL); the demo build is the fallback when sandboxes aren't
+ * running. Runtime errors will arrive via postMessage.
  */
 const DEMO_SRC = "/preview-demo.html";
 
-export function PreviewPanel({ build, onFix }: { build: BuildState; onFix: () => void }) {
+export function PreviewPanel({
+  build,
+  onFix,
+  src,
+  editHref,
+}: {
+  build: BuildState;
+  onFix: () => void;
+  /** The game's live preview URL. Falls back to the demo build. */
+  src?: string;
+  /** Where to edit the code by hand (saved games only). */
+  editHref?: string;
+}) {
+  const frameSrc = src ?? DEMO_SRC;
   const frameRef = useRef<HTMLIFrameElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -44,7 +59,7 @@ export function PreviewPanel({ build, onFix }: { build: BuildState; onFix: () =>
           <ToolbarButton
             label="Open in new tab"
             disabled={!playableVersion}
-            onClick={() => window.open(DEMO_SRC, "_blank", "noopener,noreferrer")}
+            onClick={() => window.open(frameSrc, "_blank", "noopener,noreferrer")}
           >
             <ExternalLink />
           </ToolbarButton>
@@ -62,9 +77,9 @@ export function PreviewPanel({ build, onFix }: { build: BuildState; onFix: () =>
         >
           {playableVersion !== undefined && (
             <iframe
-              key={`${playableVersion}-${reloadKey}`}
+              key={`${frameSrc}-${playableVersion}-${reloadKey}`}
               ref={frameRef}
-              src={DEMO_SRC}
+              src={frameSrc}
               title={`Game preview, version ${playableVersion}`}
               sandbox="allow-scripts allow-pointer-lock"
               allow="fullscreen; gamepad; autoplay"
@@ -75,7 +90,7 @@ export function PreviewPanel({ build, onFix }: { build: BuildState; onFix: () =>
             />
           )}
 
-          {build.status === "empty" && <EmptyStage />}
+          {build.status === "empty" && <EmptyStage editHref={editHref} />}
           {build.status === "building" && !build.previousVersion && <FirstBuild steps={build.steps} version={build.version} />}
           {build.status === "building" && build.previousVersion !== undefined && <Rebuild steps={build.steps} version={build.version} />}
           {build.status === "crashed" && (
@@ -131,7 +146,7 @@ function StatusChip({ build }: { build: BuildState }) {
   }
 }
 
-function EmptyStage() {
+function EmptyStage({ editHref }: { editHref?: string }) {
   return (
     <div className="absolute inset-0 grid place-items-center">
       <div className="absolute inset-0 opacity-80">
@@ -141,6 +156,11 @@ function EmptyStage() {
       <div className="relative mx-6 max-w-xs rounded-lg bg-night/90 px-6 py-5 text-center backdrop-blur-sm">
         <p className="font-display text-display-sm">Your game appears here.</p>
         <p className="mt-2 text-sm text-muted-foreground">Describe it in the chat. Smith will ask what matters, then build.</p>
+        {editHref && (
+          <Link href={editHref} className={buttonVariants({ variant: "ghost", size: "sm", className: "mt-3 text-muted-foreground" })}>
+            <Code2 data-icon="inline-start" /> Or edit the starter code
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -96,7 +96,7 @@ export function GameCard({
               <History /> Version history
             </DropdownMenuItem>
             <DropdownMenuItem render={<Link href={`/g/${game.id}/files`} />}>
-              <Code2 /> View files
+              <Code2 /> Edit code
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
