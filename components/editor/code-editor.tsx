@@ -68,10 +68,13 @@ const theme = EditorView.theme({
     border: "none",
   },
   ".cm-lineNumbers .cm-gutterElement": { padding: "0 16px 0 12px", minWidth: "3rem" },
-  ".cm-activeLine": { backgroundColor: "color-mix(in oklch, var(--muted) 45%, transparent)" },
-  ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--foreground)" },
+  // Mix in sRGB: oklch mixes with `transparent` drift toward red.
+  ".cm-activeLine": { backgroundColor: "transparent" },
+  "&.cm-focused .cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--foreground) 4%, transparent)" },
+  ".cm-activeLineGutter": { backgroundColor: "transparent" },
+  "&.cm-focused .cm-activeLineGutter": { color: "var(--foreground)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection": {
-    backgroundColor: "color-mix(in oklch, var(--ember) 22%, transparent)",
+    backgroundColor: "color-mix(in srgb, var(--ember) 22%, transparent)",
   },
   ".cm-matchingBracket": { backgroundColor: "var(--ember-soft)", outline: "none" },
   ".cm-searchMatch": { backgroundColor: "var(--ember-soft)" },
