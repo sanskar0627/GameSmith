@@ -134,7 +134,11 @@ Payments go through [Polar](https://polar.sh). Create one product per offer (For
 
 ### Game sandboxes
 
-Each game runs in its own isolated container with a live preview. The app reaches them through the sandbox manager; see [`sandbox/README.md`](sandbox/README.md) for the security model, local setup (`npm run sandbox:build`, `sandbox:up`, `sandbox:smoke`) and the gVisor setup for the VM. Owner-only routes: `POST/GET/DELETE /api/games/:id/sandbox`, `GET /api/games/:id/files`, and `GET/PUT/DELETE /api/games/:id/files/<path>`.
+Each game runs in its own isolated container with a live preview. The app reaches them through the sandbox manager; see [`sandbox/README.md`](sandbox/README.md) for the security model, local setup (`npm run sandbox:build`, `sandbox:up`, `sandbox:smoke`) and the gVisor setup for the VM. Owner-only routes: `POST/GET/DELETE /api/games/:id/sandbox`, `GET /api/games/:id/files`, `GET/PUT/PATCH/DELETE /api/games/:id/files/<path>` (`PATCH` renames: `{ "to": "src/new.ts" }`), and `GET /api/games/:id/download` (the source as a zip).
+
+### Live editor
+
+`/g/:id/files` is the game's code editor: its real files from the sandbox, a CodeMirror editor and the running preview side by side. Edits save shortly after you stop typing (or with Cmd/Ctrl+S) and Vite hot-reloads the preview. You can create, rename and delete files and download the source as a zip. `package.json` can be edited but not renamed or deleted, because the sandbox re-seeds the starter template without it. Without sandboxes running, the page says so; `/g/demo/files` keeps the read-only review fixtures.
 
 ### User sync
 
