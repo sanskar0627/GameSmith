@@ -16,10 +16,8 @@ const ICON = {
 } as const;
 
 /**
- * Read-only view of the game's real source. Proof that GameSmith writes an
- * actual project, and a way to see exactly what the agent changed.
- * Files come from the game's sandbox (Phase 7); until a game is built the
- * list is empty.
+ * Read-only source view, used by the design-review route (/g/demo/files).
+ * Saved games get the live editor instead (components/editor/game-editor.tsx).
  */
 export function FileBrowser({ files }: { files: GameFile[] }) {
   const sorted = useMemo(

@@ -31,6 +31,7 @@ import { ChatThread } from "./chat/chat-thread";
 import { Composer } from "./chat/composer";
 import { PreviewPanel } from "./preview/preview-panel";
 import { useMockAgent } from "./use-mock-agent";
+import { useSandboxPreview } from "./use-sandbox-preview";
 
 /**
  * The game workspace: conversation on the left, the playable game on the
@@ -164,7 +165,19 @@ export function Workspace({
     </div>
   );
 
-  const preview = <PreviewPanel build={build} onFix={fixCrash} />;
+  const playable =
+    build.status === "ready" ||
+    build.status === "crashed" ||
+    (build.status === "building" && build.previousVersion !== undefined);
+  const sandboxSrc = useSandboxPreview(game.isDemo ? null : game.id, playable);
+  const preview = (
+    <PreviewPanel
+      build={build}
+      onFix={fixCrash}
+      src={sandboxSrc}
+      editHref={game.isDemo ? undefined : `/g/${game.id}/files`}
+    />
+  );
 
   return (
     <div className="flex h-dvh min-h-0 flex-col">
@@ -208,7 +221,7 @@ export function Workspace({
                 render={
                   <Link
                     href={`/g/${game.id}/files`}
-                    aria-label="View files"
+                    aria-label="Edit code"
                     className={buttonVariants({
                       variant: "ghost",
                       size: "icon-sm",
@@ -219,7 +232,7 @@ export function Workspace({
               >
                 <Code2 />
               </TooltipTrigger>
-              <TooltipContent>View files</TooltipContent>
+              <TooltipContent>Edit code</TooltipContent>
             </Tooltip>
             <Button
               variant="outline"

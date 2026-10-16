@@ -6,6 +6,9 @@ import { serverEnv } from "@/lib/env";
 import { requireGameAccessFor } from "@/lib/server/games/access";
 import { RateLimiter } from "@/lib/server/rate-limit";
 
+import { gunzipSync } from "node:zlib";
+
+import { archiveName, readTar, writeZip } from "./archive";
 import { SandboxClient, SandboxError, type SandboxFile } from "./client";
 
 /**
@@ -23,6 +26,34 @@ export class SandboxNotConfiguredError extends Error {
 }
 
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+/** The manager caps a game's source at 100 MB; leave room for tar headers. */
+const MAX_ARCHIVE_BYTES = 110 * 1024 * 1024;
+
+/**
+ * Files the sandbox cannot run without. The entrypoint re-seeds the starter
+ * template when package.json is missing, which would overwrite the game's
+ * own files, so it can be edited but never deleted or renamed.
+ */
+const LOCKED_FILES = new Set(["package.json"]);
+
+/**
+ * Tidies a path from the editor ("./src//a.ts" -> "src/a.ts"). The sandbox
+ * does the real checks (fsop.mjs); this only rejects what is clearly wrong.
+ */
+export function normalizeFilePath(raw: string): string {
+  const parts = raw.trim().split("/").filter((p) => p !== "" && p !== ".");
+  if (parts.length === 0 || parts.some((p) => p === "..") || raw.includes("\\") || raw.includes("\0")) {
+    throw new SandboxError(400, "That isn't a valid file path.");
+  }
+  return parts.join("/");
+}
+
+function assertUnlocked(path: string) {
+  if (LOCKED_FILES.has(path)) {
+    throw new SandboxError(409, `${path} can't be deleted or renamed: the game needs it to run.`);
+  }
+}
 
 let override: SandboxClient | null = null;
 /** Tests inject a client; production builds one from the environment. */
@@ -118,7 +149,75 @@ export async function writeGameFile(
 }
 
 export async function deleteGameFile(userId: string, gameId: string, path: string, database: Executor = db()) {
-  await (await awake(userId, gameId, database)).deleteFile(gameId, path);
+  const target = normalizeFilePath(path);
+  assertUnlocked(target);
+  await (await awake(userId, gameId, database)).deleteFile(gameId, target);
+}
+
+/**
+ * Moves one file. The sandbox has no rename, so this copies then deletes;
+ * if the delete fails the file exists under both names, never under neither.
+ */
+export async function renameGameFile(
+  userId: string,
+  gameId: string,
+  from: string,
+  to: string,
+  database: Executor = db(),
+): Promise<string> {
+  const source = normalizeFilePath(from);
+  const target = normalizeFilePath(to);
+  assertUnlocked(source);
+  if (source === target) return target;
+  const c = await awake(userId, gameId, database);
+  const files = await c.listFiles(gameId);
+  if (!files.some((f) => f.path === source)) throw new SandboxError(404, "File not found");
+  if (files.some((f) => f.path === target)) throw new SandboxError(409, "A file with that name already exists.");
+  if (files.some((f) => f.path.startsWith(`${target}/`))) throw new SandboxError(409, "A folder with that name already exists.");
+  const data = await c.readFile(gameId, source);
+  await c.writeFile(gameId, target, data);
+  await c.deleteFile(gameId, source);
+  return target;
+}
+
+async function readAll(stream: ReadableStream<Uint8Array>, limit: number): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) {
+    size += chunk.byteLength;
+    if (size > limit) throw new SandboxError(413, "This game is too large to download.");
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+/**
+ * The game's source as a zip, under one folder named after the game. Uses
+ * the live workspace when the sandbox is running, otherwise its last
+ * snapshot; a game that never ran is started once so it has files.
+ */
+export async function downloadGameZip(
+  userId: string,
+  gameId: string,
+  database: Executor = db(),
+): Promise<{ filename: string; data: Buffer }> {
+  const game = await requireGameAccessFor(gameId, userId, "write", database);
+  let archive: ReadableStream<Uint8Array>;
+  try {
+    archive = await client().archive(gameId);
+  } catch (error) {
+    if (!(error instanceof SandboxError) || error.status !== 404) throw error;
+    archive = await (await awake(userId, gameId, database)).archive(gameId);
+  }
+  const gz = await readAll(archive, MAX_ARCHIVE_BYTES);
+  let tar: Buffer;
+  try {
+    tar = gunzipSync(gz, { maxOutputLength: MAX_ARCHIVE_BYTES });
+  } catch {
+    throw new SandboxError(502, "The game's files could not be read.");
+  }
+  const name = archiveName(game.title);
+  return { filename: `${name}.zip`, data: writeZip(readTar(tar), name) };
 }
 
 /** Gives a duplicated game a copy of the source's files (best effort). */

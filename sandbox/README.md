@@ -43,6 +43,12 @@ Sandboxes have **no network**, so games can only use the dependencies baked
 into the image (`template/files/package.json`). Adding a package means
 rebuilding the image.
 
+The app embeds previews in a sandboxed iframe without `allow-same-origin`,
+so the page has an opaque origin and sends `Origin: null`. The template's
+`vite.config.ts` sets `server.cors: true` so module scripts and the HMR
+socket still load (Vite allows only localhost origins by default). After
+changing the template, run `npm run sandbox:build` again.
+
 ## Local development (macOS, Docker Desktop)
 
 Docker Desktop has no gVisor, so local sandboxes use `runc`. Isolation is
