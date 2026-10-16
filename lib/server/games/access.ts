@@ -1,6 +1,5 @@
 import "server-only";
 
-import { auth } from "@clerk/nextjs/server";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { db, type Executor } from "@/lib/db";
@@ -64,6 +63,8 @@ export async function requireGameAccessFor(
 
 /** Loads a game for the current request's viewer (signed in or not). */
 export async function requireGameAccess(gameId: string, intent: GameIntent): Promise<Game> {
+  // Loaded here, not at the top: the agent worker imports this module outside Next.
+  const { auth } = await import("@clerk/nextjs/server");
   const { userId } = await auth();
   return requireGameAccessFor(gameId, userId ?? null, intent);
 }
