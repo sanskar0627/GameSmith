@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import Link from "next/link";
 import { Check, Code2, ExternalLink, Maximize2, MousePointerClick, RotateCw, TriangleAlert } from "lucide-react";
 import { PixelLoader, DitherProgress } from "@/components/brand/pixel-loader";
@@ -8,7 +8,7 @@ import { Spark } from "@/components/brand/spark";
 import { DitherField } from "@/components/dither/dither-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { BuildState, BuildStep } from "@/lib/workspace/types";
+import type { BuildState, BuildStep, RuntimeError } from "@/lib/workspace/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,6 +27,8 @@ export function PreviewPanel({
   onFix,
   src,
   editHref,
+  onRuntimeError,
+  onRecovered,
 }: {
   build: BuildState;
   onFix: () => void;
@@ -34,9 +36,36 @@ export function PreviewPanel({
   src?: string;
   /** Where to edit the code by hand (saved games only). */
   editHref?: string;
+  /** The game crashed (reported by the sandbox template's error hook). */
+  onRuntimeError?: (error: RuntimeError) => void;
+  /** A hot update applied cleanly after a crash. */
+  onRecovered?: () => void;
 }) {
   const frameSrc = src ?? DEMO_SRC;
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const handlers = useRef({ onRuntimeError, onRecovered });
+  useEffect(() => {
+    handlers.current = { onRuntimeError, onRecovered };
+  });
+
+  // The sandbox template posts errors to its parent. The iframe has an opaque
+  // origin, so the check is on the sender window, never on event.origin.
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (!frameRef.current || event.source !== frameRef.current.contentWindow) return;
+      const data = event.data as { type?: unknown; message?: unknown; stack?: unknown } | null;
+      if (data?.type === "gamesmith:error" && typeof data.message === "string") {
+        handlers.current.onRuntimeError?.({
+          message: data.message.slice(0, 2000),
+          stack: typeof data.stack === "string" ? data.stack.slice(0, 4000) : undefined,
+        });
+      } else if (data?.type === "gamesmith:ok") {
+        handlers.current.onRecovered?.();
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
   const stageRef = useRef<HTMLDivElement>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
