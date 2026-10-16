@@ -80,6 +80,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. Signing in 
 | `npm run db:generate` | Write a SQL migration after changing `lib/db/schema.ts` |
 | `npm run db:migrate` | Apply pending migrations |
 | `npm run db:studio` | Browse the database in Drizzle Studio |
+| `npm run redis:up` | Start the local Redis container (agent queue and events) |
+| `npm run worker` | Run the agent worker (when `AGENT_QUEUE=redis`) |
 | `npm run build` | Create a production build |
 | `npm run start` | Serve the production build locally |
 
@@ -135,6 +137,17 @@ Payments go through [Polar](https://polar.sh). Create one product per offer (For
 ### Game sandboxes
 
 Each game runs in its own isolated container with a live preview. The app reaches them through the sandbox manager; see [`sandbox/README.md`](sandbox/README.md) for the security model, local setup (`npm run sandbox:build`, `sandbox:up`, `sandbox:smoke`) and the gVisor setup for the VM. Owner-only routes: `POST/GET/DELETE /api/games/:id/sandbox`, `GET /api/games/:id/files`, `GET/PUT/PATCH/DELETE /api/games/:id/files/<path>` (`PATCH` renames: `{ "to": "src/new.ts" }`), and `GET /api/games/:id/download` (the source as a zip).
+
+### The agent
+
+Smith, the agent, builds the game in its sandbox: it can ask one question, proposes a brief, writes files, and saves playable versions (checkpoints). Runs are started with `POST /api/games/:id/runs` (a prompt, an answer, approving the brief, or the saved first prompt) and stream to the workspace over server-sent events (`GET /api/games/:id/runs/:runId/events`, resumable with `Last-Event-ID`); `POST .../cancel` stops one. Only one run per game at a time. Sparks are held when a run starts and settled from real token usage when it ends; runs on the player's own key cost no sparks. When the game crashes in the preview, the template reports the error and the workspace offers "Ask Smith to fix it".
+
+How runs execute is set by `AGENT_QUEUE`:
+
+- `inline` (local default): the run executes inside `npm run dev`. Nothing else to start.
+- `redis` (production default): the app queues runs in BullMQ and a separate worker executes them; events go through Redis Streams. Start Redis with `npm run redis:up` and the worker with `npm run worker` (`AGENT_CONCURRENCY` runs per process).
+
+The agent needs sandboxes (below) and a model it can use: a platform key (`PLATFORM_*`) for models paid with sparks, or your own key in Settings > API keys. The code lives in [`lib/server/agent`](lib/server/agent) (runner, tools, prompt, event bus, queue) and [`worker/main.mts`](worker/main.mts). Set `TEST_REDIS_URL` to also run the Redis integration test.
 
 ### Live editor
 
