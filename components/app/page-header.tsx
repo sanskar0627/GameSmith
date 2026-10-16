@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { Spark } from "@/components/brand/spark";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -26,6 +28,10 @@ export function PageHeader({
       )}
     >
       <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground" />
+      {/* Phones: the sidebar (and its wordmark) lives in a sheet, so keep the mark visible. */}
+      <Link href="/games" aria-label="GameSmith home" className="rounded-sm p-1 md:hidden">
+        <Spark size={14} />
+      </Link>
       <Separator orientation="vertical" className="mx-1 h-4 data-vertical:self-center" />
       <div className="flex min-w-0 flex-1 items-baseline gap-2">
         {eyebrow && <span className="label-pixel hidden text-muted-foreground sm:inline">{eyebrow}</span>}
