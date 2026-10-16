@@ -86,3 +86,12 @@ export async function dispatchRun(runId: string): Promise<void> {
   // Fire and forget: the browser follows along over SSE.
   void execute(runId).catch((error) => console.error("[agent] inline run crashed", error));
 }
+
+/** Closes the queue and Redis connections (worker shutdown, tests). */
+export async function closeAgentConnections() {
+  await globalForAgent.__gsQueue?.close();
+  globalForAgent.__gsQueue = undefined;
+  globalForAgent.__gsRedis?.disconnect();
+  globalForAgent.__gsRedis = undefined;
+  globalForAgent.__gsBus = undefined;
+}

@@ -13,7 +13,7 @@ nextEnv.loadEnvConfig(process.cwd());
 
 const { Worker } = await import("bullmq");
 const { serverEnv } = await import("@/lib/env");
-const { QUEUE_NAME, redisOptions, runBus } = await import("@/lib/server/agent/queue");
+const { QUEUE_NAME, closeAgentConnections, redisOptions, runBus } = await import("@/lib/server/agent/queue");
 const { executeRun } = await import("@/lib/server/agent/runner");
 const { sweepStaleRuns } = await import("@/lib/server/agent/service");
 
@@ -62,6 +62,7 @@ async function shutdown(signal: string) {
   // Ask running agents to stop; each saves what it has and settles its sparks.
   await Promise.all([...active].map((runId) => runBus().cancel(runId)));
   await worker.close();
+  await closeAgentConnections();
   process.exit(0);
 }
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
