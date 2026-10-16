@@ -1,3 +1,4 @@
+import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 
@@ -44,7 +45,7 @@ export function fakeSandbox(seed: Record<string, string> = { "package.json": "{}
   return { files, snapshots, calls, client: new SandboxClient("http://manager:4100", "token", fetchImpl), isRunning: () => running };
 }
 
-type Chunk = Parameters<typeof simulateReadableStream>[0]["chunks"][number];
+type Chunk = LanguageModelV4StreamPart;
 
 export function usage(input: number, output: number) {
   return {
@@ -80,7 +81,7 @@ export function scriptedModel(steps: Chunk[][], options: { delayMs?: number } = 
       const chunks = steps[Math.min(call, steps.length - 1)]!;
       call++;
       return {
-        stream: simulateReadableStream({ chunks, chunkDelayInMs: options.delayMs ?? null, initialDelayInMs: null }),
+        stream: simulateReadableStream<Chunk>({ chunks, chunkDelayInMs: options.delayMs ?? null, initialDelayInMs: null }),
       };
     },
   });

@@ -5,6 +5,7 @@ import { pickInitialModel } from "@/lib/ai/models";
 import { getDemoVersions } from "@/lib/games/mock";
 import type { GameCard } from "@/lib/games/types";
 import { listModelOptions } from "@/lib/server/ai/access";
+import { activeRun } from "@/lib/server/agent/service";
 import { GameNotFoundError, requireGameAccessFor } from "@/lib/server/games/access";
 import { listMessages, listVersions, toChatMessage, toGameVersion } from "@/lib/server/games/queries";
 import { ensureUser } from "@/lib/server/users";
@@ -63,15 +64,19 @@ export default async function GamePage({ params, searchParams }: Props) {
     if (error instanceof GameNotFoundError) notFound();
     throw error;
   });
-  const [thread, versions] = await Promise.all([listMessages(game.id), listVersions(game.id)]);
+  const [thread, versions, runId] = await Promise.all([
+    listMessages(game.id),
+    listVersions(game.id),
+    activeRun(user.id, game.id),
+  ]);
   const messages = thread.map(toChatMessage);
 
   // A prompt the agent has not answered yet (e.g. the first one, saved when the
-  // game was created) is replayed so the agent responds to it on load.
+  // game was created) starts a run on load, unless one is already going.
   const last = messages.at(-1);
-  const pending = last?.role === "user" ? textOf(last) : undefined;
+  const pending = !runId && last?.role === "user" ? textOf(last) : undefined;
   const initial: WorkspaceSnapshot = {
-    messages: pending ? messages.slice(0, -1) : messages,
+    messages,
     build: game.currentVersion > 0 ? { status: "ready", version: game.currentVersion } : { status: "empty" },
     activity: { state: "idle" },
   };
@@ -92,6 +97,7 @@ export default async function GamePage({ params, searchParams }: Props) {
       models={models}
       initial={initial}
       autoPrompt={pending}
+      activeRunId={runId}
       initialPanel={initialPanel}
     />
   );

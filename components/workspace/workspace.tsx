@@ -24,19 +24,21 @@ import { toast } from "@/components/ui/toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { ModelOption } from "@/lib/ai/models";
 import type { GameVersion, GameVisibility } from "@/lib/games/types";
-import type { BriefPart, WorkspaceSnapshot } from "@/lib/workspace/types";
+import type { Attachment, BriefPart, RuntimeError, WorkspaceSnapshot } from "@/lib/workspace/types";
 import { setGameModelAction, setVisibilityAction } from "@/lib/server/games/actions";
 import { cn } from "@/lib/utils";
 import { ChatThread } from "./chat/chat-thread";
 import { Composer } from "./chat/composer";
 import { PreviewPanel } from "./preview/preview-panel";
+import { useAgent } from "./use-agent";
 import { useMockAgent } from "./use-mock-agent";
 import { useSandboxPreview } from "./use-sandbox-preview";
 
 /**
  * The game workspace: conversation on the left, the playable game on the
- * right. Phones get Chat / Play tabs. Driven by the demo agent for now;
- * the real agent hook will return the same shape.
+ * right. Phones get Chat / Play tabs. Saved games talk to the real agent
+ * (use-agent.ts); the design-review route /g/demo uses the scripted demo
+ * agent, which returns the same shape.
  */
 export type WorkspaceGame = {
   id: string;
@@ -47,15 +49,7 @@ export type WorkspaceGame = {
   isDemo: boolean;
 };
 
-export function Workspace({
-  game,
-  versions,
-  initial,
-  autoPrompt,
-  resumeBuild = false,
-  initialPanel,
-  models,
-}: {
+type WorkspaceProps = {
   game: WorkspaceGame;
   /** Model picker options for this user (see listModelOptions). */
   models: ModelOption[];
@@ -65,10 +59,44 @@ export function Workspace({
   /** A prompt the agent has not answered yet; it replies on load. */
   autoPrompt?: string;
   resumeBuild?: boolean;
+  /** A run already in progress for this game (page opened mid-run). */
+  activeRunId?: string | null;
   initialPanel?: "versions";
-}) {
-  const { messages, build, activity, send, answer, approveBrief, stop } =
-    useMockAgent(initial, { autoPrompt, resumeBuild });
+};
+
+/** What the workspace needs from an agent, real or scripted. */
+type AgentHandle = Pick<ReturnType<typeof useMockAgent>, "messages" | "build" | "activity" | "approveBrief" | "stop"> & {
+  send: (text: string, attachments?: Attachment[]) => void;
+  answer: (askId: string, value: string) => void | Promise<void>;
+  reportCrash?: (error: RuntimeError) => void;
+  clearCrash?: () => void;
+};
+
+export function Workspace(props: WorkspaceProps) {
+  return props.game.isDemo ? <DemoWorkspace {...props} /> : <LiveWorkspace {...props} />;
+}
+
+function DemoWorkspace(props: WorkspaceProps) {
+  const agent = useMockAgent(props.initial, { autoPrompt: props.autoPrompt, resumeBuild: props.resumeBuild });
+  return <WorkspaceView {...props} agent={agent} />;
+}
+
+function LiveWorkspace(props: WorkspaceProps) {
+  const agent = useAgent(props.game.id, props.initial, {
+    activeRunId: props.activeRunId,
+    autoResume: Boolean(props.autoPrompt),
+  });
+  return <WorkspaceView {...props} agent={agent} />;
+}
+
+function WorkspaceView({
+  game,
+  versions,
+  initialPanel,
+  models,
+  agent,
+}: WorkspaceProps & { agent: AgentHandle }) {
+  const { messages, build, activity, send, answer, approveBrief, stop } = agent;
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const isMobile = useIsMobile();
   const [tab, setTab] = useState<"chat" | "play">("chat");
@@ -176,6 +204,8 @@ export function Workspace({
       onFix={fixCrash}
       src={sandboxSrc}
       editHref={game.isDemo ? undefined : `/g/${game.id}/files`}
+      onRuntimeError={agent.reportCrash}
+      onRecovered={agent.clearCrash}
     />
   );
 
@@ -185,21 +215,23 @@ export function Workspace({
         title={title}
         actions={
           <>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Badge
-                    variant="pixel"
-                    className="hidden cursor-default sm:inline-flex"
-                  />
-                }
-              >
-                <Spark size={7} /> Demo agent
-              </TooltipTrigger>
-              <TooltipContent>
-                Responses are scripted until the real agent is connected.
-              </TooltipContent>
-            </Tooltip>
+            {game.isDemo && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Badge
+                      variant="pixel"
+                      className="hidden cursor-default sm:inline-flex"
+                    />
+                  }
+                >
+                  <Spark size={7} /> Demo agent
+                </TooltipTrigger>
+                <TooltipContent>
+                  This review page uses scripted responses.
+                </TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger
                 render={
