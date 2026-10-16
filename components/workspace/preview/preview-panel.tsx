@@ -26,14 +26,17 @@ export function PreviewPanel({
   build,
   onFix,
   src,
+  problem,
   editHref,
   onRuntimeError,
   onRecovered,
 }: {
   build: BuildState;
   onFix: () => void;
-  /** The game's live preview URL. Falls back to the demo build. */
-  src?: string;
+  /** The game's live preview URL; null while it starts. Undefined = demo build (review route). */
+  src?: string | null;
+  /** Why a saved game has no preview (shown instead of the game). */
+  problem?: string | null;
   /** Where to edit the code by hand (saved games only). */
   editHref?: string;
   /** The game crashed (reported by the sandbox template's error hook). */
@@ -41,7 +44,7 @@ export function PreviewPanel({
   /** A hot update applied cleanly after a crash. */
   onRecovered?: () => void;
 }) {
-  const frameSrc = src ?? DEMO_SRC;
+  const frameSrc = src === undefined ? DEMO_SRC : src;
   const frameRef = useRef<HTMLIFrameElement>(null);
   const handlers = useRef({ onRuntimeError, onRecovered });
   useEffect(() => {
@@ -87,8 +90,8 @@ export function PreviewPanel({
           </ToolbarButton>
           <ToolbarButton
             label="Open in new tab"
-            disabled={!playableVersion}
-            onClick={() => window.open(frameSrc, "_blank", "noopener,noreferrer")}
+            disabled={!playableVersion || !frameSrc}
+            onClick={() => frameSrc && window.open(frameSrc, "_blank", "noopener,noreferrer")}
           >
             <ExternalLink />
           </ToolbarButton>
@@ -104,7 +107,8 @@ export function PreviewPanel({
           ref={stageRef}
           className="relative isolate size-full overflow-hidden rounded-xl bg-night ring-1 ring-border"
         >
-          {playableVersion !== undefined && (
+          {playableVersion !== undefined && !frameSrc && <StartingStage problem={problem} />}
+          {playableVersion !== undefined && frameSrc && (
             <iframe
               key={`${frameSrc}-${playableVersion}-${reloadKey}`}
               ref={frameRef}
@@ -282,6 +286,24 @@ function CrashOverlay({ error, onFix, onReload }: { error: { message: string; st
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StartingStage({ problem }: { problem?: string | null }) {
+  return (
+    <div className="absolute inset-0 grid place-items-center p-6 text-center">
+      {problem ? (
+        <div className="max-w-xs">
+          <p className="font-display text-display-sm">The preview isn’t running.</p>
+          <p className="mt-2 text-sm text-muted-foreground">{problem}</p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+          <PixelLoader label="Starting the game" />
+          Starting the game…
+        </div>
+      )}
     </div>
   );
 }

@@ -197,12 +197,13 @@ function WorkspaceView({
     build.status === "ready" ||
     build.status === "crashed" ||
     (build.status === "building" && build.previousVersion !== undefined);
-  const sandboxSrc = useSandboxPreview(game.isDemo ? null : game.id, playable);
+  const sandbox = useSandboxPreview(game.isDemo ? null : game.id, playable);
   const preview = (
     <PreviewPanel
       build={build}
       onFix={fixCrash}
-      src={sandboxSrc}
+      src={game.isDemo ? undefined : sandbox.url}
+      problem={sandbox.problem}
       editHref={game.isDemo ? undefined : `/g/${game.id}/files`}
       onRuntimeError={agent.reportCrash}
       onRecovered={agent.clearCrash}
