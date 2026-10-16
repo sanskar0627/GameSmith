@@ -66,4 +66,31 @@ describe("serverEnv", () => {
     vi.stubEnv("PLATFORM_OPENAI_API_KEY", "   ");
     expect((await loadEnv())().PLATFORM_OPENAI_API_KEY).toBeUndefined();
   });
+
+  describe("agent queue", () => {
+    it("runs inline in development and builds the local Redis URL from its password", async () => {
+      vi.stubEnv("NODE_ENV", "development");
+      vi.stubEnv("REDIS_URL", "");
+      vi.stubEnv("REDIS_PASSWORD", "r/pw");
+      const env = (await loadEnv())();
+      expect(env.AGENT_QUEUE).toBe("inline");
+      expect(env.REDIS_URL).toBe("redis://:r%2Fpw@127.0.0.1:6379");
+    });
+
+    it("uses Redis in production and requires REDIS_URL there", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("KEY_ENCRYPTION_KEYS", `1:${Buffer.alloc(32, 9).toString("base64")}`);
+      vi.stubEnv("REDIS_URL", "");
+      expect(await loadEnv()).toThrow(/REDIS_URL/);
+      vi.stubEnv("REDIS_URL", "redis://redis:6379");
+      expect((await loadEnv())().AGENT_QUEUE).toBe("redis");
+    });
+
+    it("refuses inline runs in production", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("KEY_ENCRYPTION_KEYS", `1:${Buffer.alloc(32, 9).toString("base64")}`);
+      vi.stubEnv("AGENT_QUEUE", "inline");
+      expect(await loadEnv()).toThrow(/AGENT_QUEUE/);
+    });
+  });
 });

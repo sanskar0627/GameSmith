@@ -195,9 +195,14 @@ export async function executeRun(runId: string, deps: RunnerDeps): Promise<void>
     abort.abort();
   }, deps.timeoutMs ?? 15 * 60_000);
   let stepCount = 0;
-  const heartbeat = setInterval(() => {
-    void database.update(agentRuns).set({ heartbeatAt: new Date(), steps: stepCount }).where(eq(agentRuns.id, runId));
-  }, deps.heartbeatMs ?? 30_000);
+  // Heartbeats are chained so none is left running once the run is settled.
+  let beats: Promise<unknown> = Promise.resolve();
+  const beat = () => {
+    beats = beats
+      .then(() => database.update(agentRuns).set({ heartbeatAt: new Date(), steps: stepCount }).where(eq(agentRuns.id, runId)))
+      .catch((error) => console.error("[agent] heartbeat failed", error));
+  };
+  const heartbeat = setInterval(beat, deps.heartbeatMs ?? 30_000);
 
   /* --- The loop ---------------------------------------------------------- */
 
@@ -327,7 +332,7 @@ export async function executeRun(runId: string, deps: RunnerDeps): Promise<void>
         case "finish-step":
           stepCount++;
           addUsage(usage, part.usage);
-          void database.update(agentRuns).set({ heartbeatAt: new Date(), steps: stepCount }).where(eq(agentRuns.id, runId));
+          beat();
           break;
         case "error":
           errorMessage = friendlyError(part.error, spec);
@@ -377,6 +382,8 @@ export async function executeRun(runId: string, deps: RunnerDeps): Promise<void>
   }
 
   const finalParts = parts.filter((p) => !(p.type === "text" && !p.text.trim()));
+  beat();
+  await beats;
   try {
     if (finalParts.length > 0) {
       await database.insert(messages).values({ id: messageId, gameId: game.id, runId, role: "assistant", parts: finalParts });
