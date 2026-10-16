@@ -130,8 +130,8 @@ export const messages = pgTable(
     gameId: uuid("game_id")
       .notNull()
       .references(() => games.id, { onDelete: "cascade" }),
-    /** Agent run that produced this message (foreign key added with agent_runs, Phase 6/9). */
-    runId: uuid("run_id"),
+    /** Agent run that produced (or started) this message. */
+    runId: uuid("run_id").references(() => agentRuns.id, { onDelete: "set null" }),
     role: messageRoleEnum("role").notNull(),
     parts: jsonb("parts").$type<MessagePart[]>().notNull(),
     attachments: jsonb("attachments").$type<Attachment[]>(),
@@ -295,6 +295,12 @@ export const agentRuns = pgTable(
     provider: providerEnum("provider").notNull(),
     billingMode: billingModeEnum("billing_mode").notNull(),
     status: runStatusEnum("status").notNull().default("running"),
+    /** What the player asked for (becomes the label source for versions). */
+    prompt: text("prompt").notNull().default(""),
+    /** Model steps taken so far. */
+    steps: integer("steps").notNull().default(0),
+    /** Last sign of life from the worker; stale running runs are failed and released. */
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }).notNull().defaultNow(),
     inputTokens: integer("input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),
     costMicroUsd: integer("cost_micro_usd").notNull().default(0),
@@ -311,6 +317,8 @@ export const agentRuns = pgTable(
   (t) => [
     index("agent_runs_user_created_idx").on(t.userId, t.createdAt),
     index("agent_runs_game_idx").on(t.gameId),
+    // One agent at a time per game: two runs would fight over the same files.
+    uniqueIndex("agent_runs_one_running_uq").on(t.gameId).where(sql`${t.status} = 'running'`),
     check(
       "agent_runs_nonneg",
       sql`${t.reservedGranted} >= 0 and ${t.reservedPurchased} >= 0 and ${t.sparksCharged} >= 0 and ${t.inputTokens} >= 0 and ${t.outputTokens} >= 0`,

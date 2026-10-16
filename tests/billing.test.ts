@@ -84,6 +84,23 @@ describe("wallet periods", () => {
     expect(reasons).toContain("expire");
     expect(await ledgerMatchesWallet("user_a")).toBe(true);
   });
+
+  it("allows only one running agent per game", async () => {
+    const { runs, wallet } = await load();
+    await createUser("user_a");
+    const game = await createGame("user_a");
+    await wallet.getWallet("user_a");
+    await setBalance("user_a", 5_000, 0);
+    const first = await runs.startRun({ userId: "user_a", gameId: game.id, modelId: sonnet.id, budgetSparks: 300 });
+    await expect(
+      runs.startRun({ userId: "user_a", gameId: game.id, modelId: sonnet.id, budgetSparks: 300 }),
+    ).rejects.toThrow();
+    // The refused run held nothing.
+    expect(await walletOf("user_a")).toMatchObject({ granted: 4_700 });
+    await runs.finishRun({ runId: first.run.id, spec: sonnet, usage: { inputTokens: 0, outputTokens: 0 }, outcome: "canceled" });
+    await runs.startRun({ userId: "user_a", gameId: game.id, modelId: sonnet.id, budgetSparks: 300 });
+    expect(await ledgerMatchesWallet("user_a")).toBe(true);
+  });
 });
 
 describe("runs on sparks", () => {
@@ -207,13 +224,14 @@ describe("concurrency", () => {
   it("parallel runs can never overspend the wallet", async () => {
     const { runs, wallet } = await load();
     await createUser("user_a");
-    const game = await createGame("user_a");
+    // One game per run: a game only ever has one running agent (see below).
+    const games = await Promise.all(Array.from({ length: 12 }, () => createGame("user_a")));
     await wallet.getWallet("user_a");
     await setBalance("user_a", 500, 500);
     // Each run asks for 300. Only 3 fit (900); the 4th gets the last 100; the rest fail.
     // Split across both buckets, so a stale read would pick a wrong split and fail.
     const attempts = await Promise.allSettled(
-      Array.from({ length: 12 }, () =>
+      games.map((game) =>
         runs.startRun({ userId: "user_a", gameId: game.id, modelId: sonnet.id, budgetSparks: 300 }),
       ),
     );
