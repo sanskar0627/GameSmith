@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import Link from "next/link";
 import { Check, Code2, ExternalLink, Maximize2, MousePointerClick, RotateCw, TriangleAlert } from "lucide-react";
 import { PixelLoader, DitherProgress } from "@/components/brand/pixel-loader";
@@ -8,7 +8,7 @@ import { Spark } from "@/components/brand/spark";
 import { DitherField } from "@/components/dither/dither-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { BuildState, BuildStep } from "@/lib/workspace/types";
+import type { BuildState, BuildStep, RuntimeError } from "@/lib/workspace/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,17 +26,49 @@ export function PreviewPanel({
   build,
   onFix,
   src,
+  problem,
   editHref,
+  onRuntimeError,
+  onRecovered,
 }: {
   build: BuildState;
   onFix: () => void;
-  /** The game's live preview URL. Falls back to the demo build. */
-  src?: string;
+  /** The game's live preview URL; null while it starts. Undefined = demo build (review route). */
+  src?: string | null;
+  /** Why a saved game has no preview (shown instead of the game). */
+  problem?: string | null;
   /** Where to edit the code by hand (saved games only). */
   editHref?: string;
+  /** The game crashed (reported by the sandbox template's error hook). */
+  onRuntimeError?: (error: RuntimeError) => void;
+  /** A hot update applied cleanly after a crash. */
+  onRecovered?: () => void;
 }) {
-  const frameSrc = src ?? DEMO_SRC;
+  const frameSrc = src === undefined ? DEMO_SRC : src;
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const handlers = useRef({ onRuntimeError, onRecovered });
+  useEffect(() => {
+    handlers.current = { onRuntimeError, onRecovered };
+  });
+
+  // The sandbox template posts errors to its parent. The iframe has an opaque
+  // origin, so the check is on the sender window, never on event.origin.
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (!frameRef.current || event.source !== frameRef.current.contentWindow) return;
+      const data = event.data as { type?: unknown; message?: unknown; stack?: unknown } | null;
+      if (data?.type === "gamesmith:error" && typeof data.message === "string") {
+        handlers.current.onRuntimeError?.({
+          message: data.message.slice(0, 2000),
+          stack: typeof data.stack === "string" ? data.stack.slice(0, 4000) : undefined,
+        });
+      } else if (data?.type === "gamesmith:ok") {
+        handlers.current.onRecovered?.();
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
   const stageRef = useRef<HTMLDivElement>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -58,8 +90,8 @@ export function PreviewPanel({
           </ToolbarButton>
           <ToolbarButton
             label="Open in new tab"
-            disabled={!playableVersion}
-            onClick={() => window.open(frameSrc, "_blank", "noopener,noreferrer")}
+            disabled={!playableVersion || !frameSrc}
+            onClick={() => frameSrc && window.open(frameSrc, "_blank", "noopener,noreferrer")}
           >
             <ExternalLink />
           </ToolbarButton>
@@ -75,7 +107,8 @@ export function PreviewPanel({
           ref={stageRef}
           className="relative isolate size-full overflow-hidden rounded-xl bg-night ring-1 ring-border"
         >
-          {playableVersion !== undefined && (
+          {playableVersion !== undefined && !frameSrc && <StartingStage problem={problem} />}
+          {playableVersion !== undefined && frameSrc && (
             <iframe
               key={`${frameSrc}-${playableVersion}-${reloadKey}`}
               ref={frameRef}
@@ -253,6 +286,24 @@ function CrashOverlay({ error, onFix, onReload }: { error: { message: string; st
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StartingStage({ problem }: { problem?: string | null }) {
+  return (
+    <div className="absolute inset-0 grid place-items-center p-6 text-center">
+      {problem ? (
+        <div className="max-w-xs">
+          <p className="font-display text-display-sm">The preview isn’t running.</p>
+          <p className="mt-2 text-sm text-muted-foreground">{problem}</p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+          <PixelLoader label="Starting the game" />
+          Starting the game…
+        </div>
+      )}
     </div>
   );
 }

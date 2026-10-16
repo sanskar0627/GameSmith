@@ -59,6 +59,14 @@ const schema = z.object({
   SANDBOX_MANAGER_URL: z.url().optional(),
   SANDBOX_MANAGER_TOKEN: optionalSecret,
   SANDBOX_PREVIEW_ORIGIN: z.url().optional(),
+  // Agent runs (Phase 9). "redis": BullMQ queue + worker + Redis Streams.
+  // "inline": the run executes in this process (development only).
+  AGENT_QUEUE: z.enum(["redis", "inline"]),
+  REDIS_URL: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^rediss?:\/\//.test(v), "REDIS_URL must be a redis:// URL"),
+  AGENT_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
@@ -90,10 +98,23 @@ export function serverEnv(): ServerEnv {
     );
   }
 
+  input.AGENT_QUEUE ||= input.NODE_ENV === "production" ? "redis" : "inline";
+  if (!input.REDIS_URL && input.NODE_ENV !== "production" && input.REDIS_PASSWORD) {
+    // The compose Redis (npm run redis:up), like the database fallback above.
+    input.REDIS_URL = `redis://:${encodeURIComponent(input.REDIS_PASSWORD)}@127.0.0.1:6379`;
+  }
+  if (!input.REDIS_URL) delete input.REDIS_URL;
+
   const parsed = schema.safeParse(input);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Invalid server environment:\n${issues}`);
+  }
+  if (parsed.data.NODE_ENV === "production" && parsed.data.AGENT_QUEUE === "inline") {
+    throw new Error("Invalid server environment:\n  - AGENT_QUEUE: inline runs are for development; use redis in production");
+  }
+  if (parsed.data.AGENT_QUEUE === "redis" && !parsed.data.REDIS_URL) {
+    throw new Error("Invalid server environment:\n  - REDIS_URL: required when AGENT_QUEUE=redis");
   }
   cached = parsed.data;
   return cached;
