@@ -13,3 +13,8 @@ export function timeAgo(iso: string) {
       .replace(/ years?/, "y") + " ago"
   );
 }
+
+/** Whole days from now until `iso` (never negative). */
+export function daysUntil(iso: string) {
+  return Math.max(0, Math.ceil((Date.parse(iso) - Date.now()) / 86_400_000));
+}
