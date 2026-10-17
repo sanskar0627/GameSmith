@@ -57,7 +57,7 @@ export function VersionHistory({
       <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
         <SheetHeader className="border-b border-hairline px-5 pt-5 pb-4">
           <span className="label-pixel text-ember-text">Version history</span>
-          <SheetTitle className="font-display text-display-sm font-normal">
+          <SheetTitle>
             {title}
           </SheetTitle>
           <SheetDescription>
