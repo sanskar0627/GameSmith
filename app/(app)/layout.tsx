@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <Toaster>
         <SidebarProvider defaultOpen={sidebarOpen}>
           <AppSidebar games={recentGames} sparks={sparks} />
-          <SidebarInset className="min-w-0 bg-background">{children}</SidebarInset>
+          <SidebarInset id="main" className="min-w-0 bg-background">{children}</SidebarInset>
           <WelcomeDialog />
         </SidebarProvider>
       </Toaster>
