@@ -149,7 +149,7 @@ export function FileBrowser({ files }: { files: GameFile[] }) {
               <div key={i} className="flex hover:bg-muted/40">
                 <span
                   aria-hidden
-                  className="w-12 shrink-0 pr-4 text-right text-muted-foreground/60 select-none"
+                  className="w-12 shrink-0 pr-4 text-right text-muted-foreground select-none"
                 >
                   {i + 1}
                 </span>
