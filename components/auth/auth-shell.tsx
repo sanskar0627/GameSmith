@@ -68,7 +68,7 @@ export function AuthShell({ variant, children }: AuthShellProps) {
       </aside>
 
       {/* Form */}
-      <main className="grain flex flex-col bg-background px-5 py-8 sm:px-10 lg:py-10">
+      <main id="main" className="grain flex flex-col bg-background px-5 py-8 sm:px-10 lg:py-10">
         <div className="relative z-10 mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-6">{children}</div>
         <footer className="relative z-10 mx-auto flex w-full max-w-sm items-center justify-between pt-6">
           <span className="label-pixel text-muted-foreground">&copy; {new Date().getFullYear()} GameSmith</span>
