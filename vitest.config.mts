@@ -21,7 +21,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.{ts,tsx}"],
     globalSetup: ["./tests/support/global-setup.ts"],
     setupFiles: ["./tests/support/setup.ts"],
     // Tests share one database, so run files one at a time.

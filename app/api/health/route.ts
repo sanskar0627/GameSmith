@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { connection } from "next/server";
 
 import { db } from "@/lib/db";
+import { explainDbError } from "@/lib/db/errors";
 
 /**
  * Liveness + database check for uptime monitors and the deploy script.
@@ -14,7 +15,7 @@ export async function GET() {
     await db().execute(sql`select 1`);
     return Response.json({ status: "ok", db: "ok" }, { headers });
   } catch (error) {
-    console.error("[health] database check failed", error);
+    console.error("[health] database check failed", explainDbError(error));
     return Response.json({ status: "degraded", db: "down" }, { status: 503, headers });
   }
 }
