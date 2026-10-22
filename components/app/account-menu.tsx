@@ -1,13 +1,14 @@
 "use client";
 
 import { useClerk, useUser } from "@clerk/nextjs";
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, UserRound } from "lucide-react";
+import { ArrowUpRight, ChevronsUpDown, LogOut, Monitor, Moon, Sun, UserRound } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuLinkItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -16,10 +17,11 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type ThemeChoice, useTheme } from "@/components/theme/theme";
+import { SITE } from "@/lib/site";
 
 /**
  * Account row at the foot of the sidebar. Opens a menu with profile,
- * theme and sign out. Uses Clerk for identity, our menu for the look.
+ * theme, the creator's links and sign out. Uses Clerk for identity, our menu for the look.
  */
 export function AccountMenu() {
   const { user, isLoaded } = useUser();
@@ -36,7 +38,7 @@ export function AccountMenu() {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <SidebarMenuButton size="lg" className="gap-2.5 data-popup-open:bg-sidebar-accent" />
+              <SidebarMenuButton size="lg" className="group/account gap-2.5 data-popup-open:bg-sidebar-accent" />
             }
           >
             {isLoaded && user ? (
@@ -47,7 +49,10 @@ export function AccountMenu() {
             )}
             <span className="grid flex-1 text-left leading-tight">
               <span className="truncate text-[13px] font-medium">{isLoaded ? name : "Loading"}</span>
-              <span className="truncate text-xs text-muted-foreground">{email}</span>
+              {/* Muted grey is 4.3:1 on the accent fill, so darken it while hovered or open. */}
+              <span className="truncate text-xs text-muted-foreground group-hover/account:text-foreground/75 group-data-popup-open/account:text-foreground/75">
+                {email}
+              </span>
             </span>
             <span className="sr-only">, account menu</span>
             <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" aria-hidden />
@@ -80,6 +85,24 @@ export function AccountMenu() {
                   <Monitor /> System
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="label-pixel text-muted-foreground">About GameSmith</DropdownMenuLabel>
+              {SITE.links.map((link) => (
+                <DropdownMenuLinkItem
+                  key={link.id}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  closeOnClick
+                >
+                  {link.label}
+                  <span className="sr-only">: {link.description} (opens in a new tab)</span>
+                  <ArrowUpRight className="ml-auto text-muted-foreground" aria-hidden />
+                </DropdownMenuLinkItem>
+              ))}
+              <p className="px-1.5 pt-1 pb-1.5 text-xs text-muted-foreground">{SITE.attribution}</p>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut({ redirectUrl: "/" })}>
