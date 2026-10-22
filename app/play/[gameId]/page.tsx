@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Wordmark } from "@/components/brand/wordmark";
+import { MadeBy } from "@/components/brand/made-by";
 import { Spark } from "@/components/brand/spark";
 import { buttonVariants } from "@/components/ui/button";
 import { getDemoGame } from "@/lib/games/mock";
@@ -49,6 +50,9 @@ export default async function PlayPage({ params }: Props) {
           className="size-full rounded-xl border-0 bg-night ring-1 ring-border"
         />
       </div>
+      <footer className="shrink-0 border-t border-hairline px-3 py-2 sm:px-4">
+        <MadeBy layout="row" className="text-xs" />
+      </footer>
     </main>
   );
 }

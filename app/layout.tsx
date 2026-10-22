@@ -5,6 +5,7 @@ import type { Viewport } from "next";
 import { Geist, Geist_Mono, Geist_Pixel, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { ThemeScript } from "@/components/theme/theme-script";
+import { SITE } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,6 +29,11 @@ const instrumentSerif = Instrument_Serif({
 const geistPixel = Geist_Pixel({
   variable: "--font-geist-pixel",
   subsets: ["latin"],
+  // Next has no metric overrides for this display face, so it cannot build a
+  // size-adjusted fallback (and warns on every compile). Labels are short and
+  // monospaced, so a plain monospace fallback is fine.
+  adjustFontFallback: false,
+  fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
 });
 
 const DESCRIPTION = "Describe a game in a sentence. GameSmith's agent designs it, builds it in real code, and hands you something to play.";
@@ -39,7 +45,9 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   applicationName: "GameSmith",
   openGraph: { type: "website", siteName: "GameSmith", title: "GameSmith", description: DESCRIPTION },
-  twitter: { card: "summary_large_image", title: "GameSmith", description: DESCRIPTION },
+  twitter: { card: "summary_large_image", title: "GameSmith", description: DESCRIPTION, creator: SITE.creator.xHandle },
+  authors: [{ name: SITE.creator.name, url: SITE.links[0].href }],
+  creator: SITE.creator.name,
 };
 
 export const viewport: Viewport = {
