@@ -6,6 +6,7 @@ import { cache } from "react";
 
 import { requireUser } from "@/lib/auth";
 import { db, type Executor } from "@/lib/db";
+import { explainDbError } from "@/lib/db/errors";
 import { users, type User } from "@/lib/db/schema";
 
 /** The subset of a Clerk user that GameSmith stores. */
@@ -82,7 +83,13 @@ export async function getUserById(id: string, database: Executor = db()): Promis
  */
 export const ensureUser = cache(async (): Promise<User> => {
   const { userId } = await requireUser();
-  const existing = await getUserById(userId);
+  let existing: User | null;
+  try {
+    existing = await getUserById(userId);
+  } catch (error) {
+    // First query of every app page: say how to fix a missing/unmigrated database.
+    throw explainDbError(error);
+  }
   if (existing) return existing;
 
   const clerkUser = await currentUser();
