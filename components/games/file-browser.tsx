@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Check, Copy, FileCode2, FileJson, FileText, Lock } from "lucide-react";
+import { Spark } from "@/components/brand/spark";
 import { Button } from "@/components/ui/button";
 import type { GameFile } from "@/lib/games/types";
 import { cn } from "@/lib/utils";
@@ -17,7 +18,8 @@ const ICON = {
 /**
  * Read-only view of the game's real source. Proof that GameSmith writes an
  * actual project, and a way to see exactly what the agent changed.
- * TODO(data): list and read files from the game's sandbox (owner only).
+ * Files come from the game's sandbox (Phase 7); until a game is built the
+ * list is empty.
  */
 export function FileBrowser({ files }: { files: GameFile[] }) {
   const sorted = useMemo(
@@ -56,6 +58,18 @@ export function FileBrowser({ files }: { files: GameFile[] }) {
       /* clipboard blocked */
     }
   };
+
+  if (sorted.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+        <Spark size={21} className="text-muted-foreground" />
+        <p className="mt-4 font-display text-display-sm">No files yet.</p>
+        <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+          The project&rsquo;s source appears here after its first build.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[240px_minmax(0,1fr)] md:grid-rows-1">

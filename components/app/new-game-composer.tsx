@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Textarea } from "@/components/ui/textarea";
+import { createGameAction } from "@/lib/server/games/actions";
 
 const IDEAS = [
   "Floating islands",
@@ -23,8 +24,8 @@ const IDEA_PROMPTS: Record<string, string> = {
 };
 
 /**
- * First-prompt composer. Opens the workspace with the prompt.
- * TODO(data): create the game server-side, then route to /g/<id>.
+ * First-prompt composer. Creates the game (the prompt becomes its first
+ * message), then opens its workspace.
  */
 export function NewGameComposer({
   initialPrompt = "",
@@ -34,11 +35,21 @@ export function NewGameComposer({
   const [value, setValue] = useState(initialPrompt);
   const router = useRouter();
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const empty = value.trim().length === 0;
 
   const submit = () => {
-    if (empty) return;
-    router.push(`/g/demo?prompt=${encodeURIComponent(value.trim())}`);
+    if (empty || pending) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await createGameAction(value);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      router.push(`/g/${result.data.id}`);
+    });
   };
 
   return (
@@ -67,7 +78,10 @@ export function NewGameComposer({
             }
           }}
           rows={3}
+          maxLength={2000}
           autoFocus
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? "prompt-error" : undefined}
           placeholder="A knight crossing floating islands, collecting crystals before the sun sets…"
           className="min-h-24 resize-none border-0 bg-transparent px-2.5 text-[15px] shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
@@ -81,13 +95,18 @@ export function NewGameComposer({
             type="submit"
             variant="ember"
             size="sm"
-            disabled={empty}
+            disabled={empty || pending}
             className="ml-auto"
           >
-            Forge <ArrowUp data-icon="inline-end" />
+            {pending ? "Forging…" : "Forge"} <ArrowUp data-icon="inline-end" />
           </Button>
         </div>
       </form>
+      {error && (
+        <p id="prompt-error" role="alert" className="mt-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         {IDEAS.map((idea) => (
