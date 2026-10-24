@@ -10,14 +10,14 @@ import { GameCover } from "@/components/games/game-cover";
 import { GameStatusChip } from "@/components/games/game-status";
 import { AuthCta } from "@/components/landing/auth-cta";
 import { Kbd } from "@/components/ui/kbd";
-import { DEMO_FILES, DEMO_GAMES } from "@/lib/games/mock";
+import { DEMO_FILES, SHOWCASE_GAMES } from "@/lib/games/mock";
 
 const NIGHT_PALETTE = ["--dither-ink", "--color-ember-900", "--ember", "--color-ember-200"];
 
 export default async function Home() {
   const user = await currentUser();
-  // TODO(data): featured public games.
-  const showcase = DEMO_GAMES.filter((g) => g.visibility === "link").slice(0, 3);
+  // Curated showcase (fixtures in lib/games/mock.ts), not users' games.
+  const showcase = SHOWCASE_GAMES;
   const snippet = DEMO_FILES[0].content.split("\n").slice(6, 23).join("\n");
 
   return (

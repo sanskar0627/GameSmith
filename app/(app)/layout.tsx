@@ -6,8 +6,8 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { demoUsage } from "@/lib/billing/mock";
-import { DEMO_GAMES } from "@/lib/games/mock";
 import type { GameSummary } from "@/lib/games/types";
+import { listRecentGames, toGameSummary } from "@/lib/server/games/queries";
 import { ensureUser } from "@/lib/server/users";
 
 /**
@@ -16,14 +16,10 @@ import { ensureUser } from "@/lib/server/users";
  * redirects signed-out visitors and creates the user's row on first visit.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  await ensureUser();
+  const user = await ensureUser();
   // Restore the sidebar's open/collapsed state without a layout jump.
   const sidebarOpen = (await cookies()).get("sidebar_state")?.value !== "false";
-  // TODO(data): load the user's 5 most recently edited games.
-  const recentGames: GameSummary[] = [...DEMO_GAMES]
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-    .slice(0, 5)
-    .map(({ id, title, status, updatedAt, thumbnailUrl }) => ({ id, title, status, updatedAt, thumbnailUrl }));
+  const recentGames: GameSummary[] = (await listRecentGames(user.id)).map(toGameSummary);
 
   // TODO(data): the user's metered usage for this billing cycle.
   const { used, allowance } = demoUsage();

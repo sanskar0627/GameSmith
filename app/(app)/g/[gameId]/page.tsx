@@ -1,14 +1,93 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Workspace, type WorkspaceGame } from "@/components/workspace/workspace";
-import { getDemoGame, getDemoVersions } from "@/lib/games/mock";
+import { getDemoVersions } from "@/lib/games/mock";
 import type { GameCard } from "@/lib/games/types";
-import { isDemoScenario } from "@/lib/workspace/mock";
+import { GameNotFoundError, requireGameAccessFor } from "@/lib/server/games/access";
+import { listMessages, listVersions, toChatMessage, toGameVersion } from "@/lib/server/games/queries";
+import { ensureUser } from "@/lib/server/users";
+import { demoSnapshot, isDemoScenario } from "@/lib/workspace/mock";
+import type { ChatMessage, WorkspaceSnapshot } from "@/lib/workspace/types";
 
-export const metadata: Metadata = { title: "Workspace" };
+type Props = {
+  params: Promise<{ gameId: string }>;
+  searchParams: Promise<{ demo?: string; panel?: string }>;
+};
 
-/** The scratch game behind /new and the ?demo= review states. */
-const DEMO_GAME: GameCard = {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { gameId } = await params;
+  if (gameId === "demo") return { title: "Workspace (review)" };
+  const user = await ensureUser();
+  const game = await requireGameAccessFor(gameId, user.id, "write").catch(() => null);
+  return { title: game?.title ?? "Workspace" };
+}
+
+/**
+ * Game workspace. Owner only: anyone else gets a 404.
+ *
+ * `/g/demo?demo=fresh|ask|building|thread|crash` is a design-review route that
+ * renders the scripted fixtures in lib/workspace/mock.ts. It stores nothing.
+ */
+export default async function GamePage({ params, searchParams }: Props) {
+  const { gameId } = await params;
+  const { demo, panel } = await searchParams;
+  const initialPanel = panel === "versions" ? "versions" : undefined;
+
+  if (gameId === "demo") {
+    const scenario = isDemoScenario(demo) ? demo : "thread";
+    return (
+      <Workspace
+        key={`demo:${scenario}`}
+        game={{ id: "demo", title: "Floating Islands", visibility: "private", isDemo: true }}
+        versions={getDemoVersions(REVIEW_GAME)}
+        initial={demoSnapshot(scenario)}
+        resumeBuild={scenario === "building"}
+        initialPanel={initialPanel}
+      />
+    );
+  }
+
+  const user = await ensureUser();
+  const game = await requireGameAccessFor(gameId, user.id, "write").catch((error: unknown) => {
+    if (error instanceof GameNotFoundError) notFound();
+    throw error;
+  });
+  const [thread, versions] = await Promise.all([listMessages(game.id), listVersions(game.id)]);
+  const messages = thread.map(toChatMessage);
+
+  // A prompt the agent has not answered yet (e.g. the first one, saved when the
+  // game was created) is replayed so the agent responds to it on load.
+  const last = messages.at(-1);
+  const pending = last?.role === "user" ? textOf(last) : undefined;
+  const initial: WorkspaceSnapshot = {
+    messages: pending ? messages.slice(0, -1) : messages,
+    build: game.currentVersion > 0 ? { status: "ready", version: game.currentVersion } : { status: "empty" },
+    activity: { state: "idle" },
+  };
+  const workspaceGame: WorkspaceGame = { id: game.id, title: game.title, visibility: game.visibility, isDemo: false };
+
+  return (
+    <Workspace
+      key={game.id}
+      game={workspaceGame}
+      versions={versions.map(toGameVersion)}
+      initial={initial}
+      autoPrompt={pending}
+      initialPanel={initialPanel}
+    />
+  );
+}
+
+function textOf(message: ChatMessage): string | undefined {
+  const text = message.parts
+    .map((p) => (p.type === "text" ? p.text : ""))
+    .join("\n")
+    .trim();
+  return text || undefined;
+}
+
+/** Fixture behind /g/demo's version history. */
+const REVIEW_GAME: GameCard = {
   id: "demo",
   title: "Floating Islands",
   status: "ready",
@@ -20,37 +99,3 @@ const DEMO_GAME: GameCard = {
   visibility: "private",
   coverSeed: 11,
 };
-
-/**
- * Game workspace.
- * TODO(data): requireGameAccess(gameId), then load the game, its messages and
- * build state instead of demo data.
- * Review states with ?demo=fresh|ask|building|thread|crash, ?panel=versions.
- */
-export default async function GamePage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ gameId: string }>;
-  searchParams: Promise<{ demo?: string; prompt?: string | string[]; panel?: string }>;
-}) {
-  const { gameId } = await params;
-  const { demo, prompt, panel } = await searchParams;
-  const card = gameId === "demo" ? DEMO_GAME : getDemoGame(gameId);
-  if (!card) notFound();
-
-  const scenario = isDemoScenario(demo) ? demo : "thread";
-  const autoPrompt = typeof prompt === "string" && prompt.trim() ? prompt.slice(0, 2000) : undefined;
-  const game: WorkspaceGame = { id: card.id, title: card.title, visibility: card.visibility, isDemo: card.id === "demo" };
-
-  return (
-    <Workspace
-      key={`${gameId}:${scenario}:${autoPrompt ?? ""}`}
-      game={game}
-      versions={getDemoVersions(card)}
-      scenario={scenario}
-      autoPrompt={autoPrompt}
-      initialPanel={panel === "versions" ? "versions" : undefined}
-    />
-  );
-}

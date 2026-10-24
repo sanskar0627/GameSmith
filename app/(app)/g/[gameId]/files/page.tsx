@@ -5,15 +5,31 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/app/page-header";
 import { FileBrowser } from "@/components/games/file-browser";
 import { buttonVariants } from "@/components/ui/button";
-import { DEMO_FILES, getDemoGame } from "@/lib/games/mock";
+import { DEMO_FILES } from "@/lib/games/mock";
+import type { GameFile } from "@/lib/games/types";
+import { GameNotFoundError, requireGameAccessFor } from "@/lib/server/games/access";
+import { ensureUser } from "@/lib/server/users";
 
 export const metadata: Metadata = { title: "Files" };
 
+/** Owner-only source view. `/g/demo/files` shows the review fixtures. */
 export default async function GameFilesPage({ params }: { params: Promise<{ gameId: string }> }) {
   const { gameId } = await params;
-  // TODO(data): requireGameAccess(gameId), then read files from the sandbox.
-  const game = getDemoGame(gameId) ?? (gameId === "demo" ? { id: "demo", title: "Floating Islands" } : undefined);
-  if (!game) notFound();
+
+  let game: { id: string; title: string };
+  let files: GameFile[];
+  if (gameId === "demo") {
+    game = { id: "demo", title: "Floating Islands" };
+    files = DEMO_FILES;
+  } else {
+    const user = await ensureUser();
+    game = await requireGameAccessFor(gameId, user.id, "write").catch((error: unknown) => {
+      if (error instanceof GameNotFoundError) notFound();
+      throw error;
+    });
+    // Files live in the game's sandbox, which arrives in Phase 7.
+    files = [];
+  }
 
   return (
     <div className="flex h-dvh min-h-0 flex-col">
@@ -33,7 +49,7 @@ export default async function GameFilesPage({ params }: { params: Promise<{ game
           </Link>
         }
       />
-      <FileBrowser files={DEMO_FILES} />
+      <FileBrowser files={files} />
     </div>
   );
 }
