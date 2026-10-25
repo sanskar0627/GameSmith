@@ -1,8 +1,9 @@
 import type { GameCard, GameFile, GameVersion } from "./types";
 
 /**
- * DEMO DATA for the library until persistence lands.
- * TODO(data): replace with queries scoped to the signed-in user.
+ * FIXTURES, not user data. Used by the landing page showcase (and its
+ * /play/<slug> pages), the /g/demo design-review workspace and tests.
+ * Signed-in users' games always come from the database.
  */
 // Relative to now so "edited 2h ago" always reads true.
 const at = (daysAgo: number, hoursAgo = 0) => new Date(Date.now() - daysAgo * 86_400_000 - hoursAgo * 3_600_000).toISOString();
@@ -20,6 +21,13 @@ export const DEMO_GAMES: GameCard[] = [
 
 export function getDemoGame(id: string): GameCard | undefined {
   return DEMO_GAMES.find((g) => g.id === id);
+}
+
+/** Public showcase games on the landing page, playable at /play/<slug>. */
+export const SHOWCASE_GAMES = DEMO_GAMES.filter((g) => g.visibility === "link").slice(0, 3);
+
+export function getShowcaseGame(slug: string): GameCard | undefined {
+  return SHOWCASE_GAMES.find((g) => g.id === slug);
 }
 
 const VERSION_NOTES: [string, string][] = [
@@ -46,6 +54,7 @@ export function getDemoVersions(game: GameCard): GameVersion[] {
       ).toISOString(),
       status: game.status === "error" && i === game.version - 1 ? ("error" as const) : ("ready" as const),
       filesChanged: i === 0 ? 6 : 1 + ((i * 3) % 4),
+      restorable: true,
     };
   }).reverse();
 }

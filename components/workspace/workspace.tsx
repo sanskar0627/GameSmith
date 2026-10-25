@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Code2, History, Share2 } from "lucide-react";
 import { PageHeader } from "@/components/app/page-header";
@@ -19,10 +19,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { toast } from "@/components/ui/toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { demoSnapshot, type DemoScenario } from "@/lib/workspace/mock";
 import type { GameVersion, GameVisibility } from "@/lib/games/types";
-import type { BriefPart } from "@/lib/workspace/types";
+import type { BriefPart, WorkspaceSnapshot } from "@/lib/workspace/types";
+import { setVisibilityAction } from "@/lib/server/games/actions";
 import { cn } from "@/lib/utils";
 import { ChatThread } from "./chat/chat-thread";
 import { Composer } from "./chat/composer";
@@ -44,24 +45,22 @@ export type WorkspaceGame = {
 export function Workspace({
   game,
   versions,
-  scenario,
+  initial,
   autoPrompt,
+  resumeBuild = false,
   initialPanel,
 }: {
   game: WorkspaceGame;
   versions: GameVersion[];
-  scenario: DemoScenario;
+  /** Thread and build state to start from (saved messages, or a review fixture). */
+  initial: WorkspaceSnapshot;
+  /** A prompt the agent has not answered yet; it replies on load. */
   autoPrompt?: string;
+  resumeBuild?: boolean;
   initialPanel?: "versions";
 }) {
-  const [initial] = useState(() =>
-    demoSnapshot(autoPrompt ? "fresh" : scenario),
-  );
   const { messages, build, activity, send, answer, approveBrief, stop } =
-    useMockAgent(initial, {
-      autoPrompt,
-      resumeBuild: !autoPrompt && scenario === "building",
-    });
+    useMockAgent(initial, { autoPrompt, resumeBuild });
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const isMobile = useIsMobile();
   const [tab, setTab] = useState<"chat" | "play">("chat");
@@ -69,6 +68,20 @@ export function Workspace({
   const [historyOpen, setHistoryOpen] = useState(initialPanel === "versions");
   const [shareOpen, setShareOpen] = useState(false);
   const [visibility, setVisibility] = useState(game.visibility);
+  const [, startTransition] = useTransition();
+
+  const changeVisibility = (next: GameVisibility) => {
+    const previous = visibility;
+    setVisibility(next);
+    if (game.isDemo) return;
+    startTransition(async () => {
+      const result = await setVisibilityAction(game.id, next);
+      if (!result.ok) {
+        setVisibility(previous);
+        toast.add({ type: "error", title: "Couldn’t change sharing", description: result.error });
+      }
+    });
+  };
 
   const busy = activity.state === "thinking" || activity.state === "working";
   const crash = build.status === "crashed" ? build.error : undefined;
@@ -208,7 +221,7 @@ export function Workspace({
         gameId={game.id}
         title={title}
         visibility={visibility}
-        onVisibilityChange={setVisibility}
+        onVisibilityChange={changeVisibility}
       />
 
       {isMobile ? (

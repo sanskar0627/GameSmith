@@ -28,6 +28,11 @@ export class GameNotFoundError extends Error {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Game ids are UUIDs; anything else can never match (and would make Postgres throw). */
+export function isUuid(value: string): boolean {
+  return UUID.test(value);
+}
+
 /** Pure rule, shared by queries and tests. */
 export function canAccessGame(
   game: Pick<Game, "ownerId" | "visibility" | "deletedAt">,
@@ -47,7 +52,7 @@ export async function requireGameAccessFor(
   intent: GameIntent,
   database: Executor = db(),
 ): Promise<Game> {
-  if (!UUID.test(gameId)) throw new GameNotFoundError();
+  if (!isUuid(gameId)) throw new GameNotFoundError();
   const [game] = await database
     .select()
     .from(games)

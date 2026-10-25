@@ -30,6 +30,8 @@ export type GameVersion = {
   createdAt: string; // ISO
   status: "ready" | "error";
   filesChanged: number;
+  /** A saved snapshot exists, so this version can be restored. */
+  restorable: boolean;
 };
 
 export type GameFile = {
