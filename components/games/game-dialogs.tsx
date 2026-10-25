@@ -139,8 +139,8 @@ function DeleteForm({
           Delete &ldquo;{title}&rdquo;?
         </AlertDialogTitle>
         <AlertDialogDescription>
-          This removes the game, its files, every version and its share link. It
-          can&rsquo;t be undone.
+          It leaves your library and its share link stops working. You can
+          undo this right after.
         </AlertDialogDescription>
       </AlertDialogHeader>
       <label className="flex flex-col gap-1.5 text-[13px]">

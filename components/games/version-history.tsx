@@ -18,8 +18,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * Version history. Every build is a version. Restoring never rewrites
- * history: it creates a new version from the old files.
- * TODO(data): restore becomes a server action that snapshots files into the sandbox.
+ * history: it creates a new version from the old files. Restore is offered
+ * only for versions with a saved snapshot (sandbox snapshots, Phase 7); the
+ * review fixtures restore locally.
  */
 export function VersionHistory({
   open,
@@ -65,6 +66,15 @@ export function VersionHistory({
             lost.
           </SheetDescription>
         </SheetHeader>
+        {versions.length === 0 && (
+          <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+            <Spark size={21} className="text-muted-foreground" />
+            <p className="mt-4 font-display text-display-sm">No versions yet.</p>
+            <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+              Each time the game builds, a version is saved here.
+            </p>
+          </div>
+        )}
         <ol className="flex-1 overflow-y-auto px-5 py-4">
           {versions.map((v, i) => {
             const isCurrent = v.version === current;
@@ -125,6 +135,7 @@ export function VersionHistory({
                     )}
                   </p>
                   {!isCurrent &&
+                    v.restorable &&
                     (confirming === v.version ? (
                       <div className="mt-2.5 flex items-center gap-2">
                         <Button size="xs" onClick={() => restore(v)}>

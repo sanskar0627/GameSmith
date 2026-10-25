@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowDownWideNarrow, Plus, Search, X } from "lucide-react";
 import { Spark } from "@/components/brand/spark";
@@ -15,6 +15,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import type { GameCard as GameCardData, GameStatus } from "@/lib/games/types";
+import {
+  deleteGameAction,
+  duplicateGameAction,
+  renameGameAction,
+  restoreGameAction,
+  setVisibilityAction,
+} from "@/lib/server/games/actions";
 import { cn } from "@/lib/utils";
 import { GameCard, type GameAction } from "./game-card";
 import { DeleteDialog, RenameDialog, ShareDialog } from "./game-dialogs";
@@ -30,19 +37,30 @@ const SORT_LABEL: Record<Sort, string> = {
   name: "Name",
 };
 
+type Change =
+  | { kind: "patch"; id: string; patch: Partial<GameCardData> }
+  | { kind: "remove"; id: string };
+
 /**
- * The library. Local state stands in for mutations until the backend lands.
- * TODO(data): rename/duplicate/delete/visibility become server actions that
- * check ownership with requireGameAccess().
+ * The library. `games` comes from the server; changes show instantly
+ * (useOptimistic) while the server action runs, and the action's refresh
+ * replaces them with the saved result. Failures roll back with a toast.
  */
-export function Library({ initialGames }: { initialGames: GameCardData[] }) {
-  const [games, setGames] = useState(initialGames);
+export function Library({ games: saved }: { games: GameCardData[] }) {
+  const [games, apply] = useOptimistic(saved, (current: GameCardData[], change: Change) =>
+    change.kind === "remove"
+      ? current.filter((g) => g.id !== change.id)
+      : current.map((g) => (g.id === change.id ? { ...g, ...change.patch } : g)),
+  );
+  const [, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("updated");
+  // The game stays set while a dialog animates closed, so its text doesn't blank out.
   const [dialog, setDialog] = useState<{
     kind: "rename" | "delete" | "share";
     game: GameCardData;
+    open: boolean;
   } | null>(null);
 
   const counts = useMemo(() => {
@@ -73,36 +91,60 @@ export function Library({ initialGames }: { initialGames: GameCardData[] }) {
       );
   }, [games, query, filter, sort]);
 
-  const update = (id: string, patch: Partial<GameCardData>) =>
-    setGames((gs) =>
-      gs.map((g) =>
-        g.id === id
-          ? { ...g, ...patch, updatedAt: new Date().toISOString() }
-          : g,
-      ),
-    );
-
-  const onAction = (action: GameAction, game: GameCardData) => {
-    if (action === "duplicate") {
-      const copy: GameCardData = {
-        ...game,
-        id: `${game.id}-copy-${Date.now().toString(36)}`,
-        title: `${game.title} (copy)`.slice(0, 60),
-        visibility: "private",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setGames((gs) => [copy, ...gs]);
-      toast.add({
-        title: "Game duplicated",
-        description: `“${copy.title}” is private until you share it.`,
-      });
-      return;
-    }
-    setDialog({ kind: action, game });
+  const failed = (error: string) => {
+    toast.add({ type: "error", title: "Couldn’t save that", description: error });
   };
 
-  const close = () => setDialog(null);
+  const rename = (game: GameCardData, title: string) =>
+    startTransition(async () => {
+      apply({ kind: "patch", id: game.id, patch: { title } });
+      const result = await renameGameAction(game.id, title);
+      if (!result.ok) return failed(result.error);
+      toast.add({ title: "Renamed", description: `Now called “${result.data.title}”.` });
+    });
+
+  const changeVisibility = (game: GameCardData, visibility: GameCardData["visibility"]) =>
+    startTransition(async () => {
+      apply({ kind: "patch", id: game.id, patch: { visibility } });
+      const result = await setVisibilityAction(game.id, visibility);
+      if (!result.ok) failed(result.error);
+    });
+
+  const restore = (game: GameCardData) =>
+    startTransition(async () => {
+      const result = await restoreGameAction(game.id);
+      if (!result.ok) return failed(result.error);
+      toast.add({ title: "Restored", description: `“${game.title}” is back.` });
+    });
+
+  const remove = (game: GameCardData) =>
+    startTransition(async () => {
+      apply({ kind: "remove", id: game.id });
+      const result = await deleteGameAction(game.id);
+      if (!result.ok) return failed(result.error);
+      toast.add({
+        title: "Game deleted",
+        description: `“${game.title}” was removed from your library.`,
+        actionProps: { children: "Undo", onClick: () => restore(game) },
+      });
+    });
+
+  const duplicate = (game: GameCardData) =>
+    startTransition(async () => {
+      const result = await duplicateGameAction(game.id);
+      if (!result.ok) return failed(result.error);
+      toast.add({
+        title: "Game duplicated",
+        description: `“${result.data.title}” is private until you share it.`,
+      });
+    });
+
+  const onAction = (action: GameAction, game: GameCardData) => {
+    if (action === "duplicate") return duplicate(game);
+    setDialog({ kind: action, game, open: true });
+  };
+
+  const close = () => setDialog((d) => (d ? { ...d, open: false } : d));
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-16 sm:px-8">
@@ -225,33 +267,24 @@ export function Library({ initialGames }: { initialGames: GameCardData[] }) {
 
       {/* Dialogs */}
       <RenameDialog
-        open={dialog?.kind === "rename"}
+        open={dialog?.kind === "rename" && dialog.open}
         onOpenChange={(o) => !o && close()}
         title={dialog?.game.title ?? ""}
         onRename={(title) => {
-          if (dialog) update(dialog.game.id, { title });
-          toast.add({
-            title: "Renamed",
-            description: `Now called “${title}”.`,
-          });
+          if (dialog) rename(dialog.game, title);
           close();
         }}
       />
       <DeleteDialog
-        open={dialog?.kind === "delete"}
+        open={dialog?.kind === "delete" && dialog.open}
         onOpenChange={(o) => !o && close()}
         title={dialog?.game.title ?? ""}
         onDelete={() => {
-          if (dialog)
-            setGames((gs) => gs.filter((g) => g.id !== dialog.game.id));
-          toast.add({
-            title: "Game deleted",
-            description: dialog ? `“${dialog.game.title}” is gone.` : undefined,
-          });
+          if (dialog) remove(dialog.game);
           close();
         }}
       />
-      {dialog?.kind === "share" && (
+      {dialog?.kind === "share" && dialog.open && (
         <ShareDialog
           open
           onOpenChange={(o) => !o && close()}
@@ -260,7 +293,7 @@ export function Library({ initialGames }: { initialGames: GameCardData[] }) {
           visibility={
             games.find((g) => g.id === dialog.game.id)?.visibility ?? "private"
           }
-          onVisibilityChange={(v) => update(dialog.game.id, { visibility: v })}
+          onVisibilityChange={(v) => changeVisibility(dialog.game, v)}
         />
       )}
     </div>
