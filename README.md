@@ -13,6 +13,7 @@ GameSmith is under active development. Authentication, the public landing experi
 - [Next.js](https://nextjs.org/) 16 with the App Router
 - [React](https://react.dev/) 19 and TypeScript
 - [Clerk](https://clerk.com/) for authentication
+- [AI SDK](https://ai-sdk.dev/) 7 with Anthropic, OpenAI, OpenRouter and Fal providers
 - [PostgreSQL](https://www.postgresql.org/) 18 with [Drizzle ORM](https://orm.drizzle.team/)
 - [Tailwind CSS](https://tailwindcss.com/) 4 with custom design tokens
 - [shadcn/ui](https://ui.shadcn.com/) and Base UI primitives
@@ -41,6 +42,14 @@ Create a local environment file from the template and add the keys from your Cle
 ```bash
 cp .env.example .env.local
 ```
+
+Generate the key that encrypts users' saved API keys and put it in `KEY_ENCRYPTION_KEYS` (optional locally, where a fixed development key is used with a warning; required in production):
+
+```bash
+node -e "console.log('1:' + require('crypto').randomBytes(32).toString('base64'))"
+```
+
+To offer models paid with sparks, set the `PLATFORM_*` provider keys. Without them, users can still run models with their own keys (Settings > API keys).
 
 Start Postgres and apply the database migrations:
 
@@ -108,6 +117,12 @@ Clerk middleware attaches authentication state to requests, but it is not the au
 - `requireApiUser()` throws an unauthorized error for API and server-action flows.
 
 When adding protected resources, validate both authentication and resource ownership at the point where the resource is accessed. For games, use `requireGameAccess(gameId, "read" | "write")` from [`lib/server/games/access.ts`](lib/server/games/access.ts); it reports every denial as "not found".
+
+### Provider keys (BYOK)
+
+Users can save their own Anthropic, OpenAI, OpenRouter and Fal keys in Settings > API keys. A key is checked with a free provider request, encrypted with AES-256-GCM (bound to the user and provider) and stored in `provider_keys`; only its last 4 characters are ever shown. Plaintext keys stay on the server: see [`lib/server/keys.ts`](lib/server/keys.ts) and [`lib/server/ai/access.ts`](lib/server/ai/access.ts). The model catalog and prices live in [`lib/ai/models.ts`](lib/ai/models.ts).
+
+To rotate the encryption key, put a new entry first in `KEY_ENCRYPTION_KEYS` and keep the old one after it (`2:<new>,1:<old>`). Saved keys are re-encrypted as they are next used.
 
 ### User sync
 

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Workspace, type WorkspaceGame } from "@/components/workspace/workspace";
+import { pickInitialModel } from "@/lib/ai/models";
 import { getDemoVersions } from "@/lib/games/mock";
 import type { GameCard } from "@/lib/games/types";
+import { listModelOptions } from "@/lib/server/ai/access";
 import { GameNotFoundError, requireGameAccessFor } from "@/lib/server/games/access";
 import { listMessages, listVersions, toChatMessage, toGameVersion } from "@/lib/server/games/queries";
 import { ensureUser } from "@/lib/server/users";
@@ -33,12 +35,22 @@ export default async function GamePage({ params, searchParams }: Props) {
   const { demo, panel } = await searchParams;
   const initialPanel = panel === "versions" ? "versions" : undefined;
 
+  const user = await ensureUser();
+  const models = await listModelOptions(user.id);
+
   if (gameId === "demo") {
     const scenario = isDemoScenario(demo) ? demo : "thread";
     return (
       <Workspace
         key={`demo:${scenario}`}
-        game={{ id: "demo", title: "Floating Islands", visibility: "private", isDemo: true }}
+        game={{
+          id: "demo",
+          title: "Floating Islands",
+          visibility: "private",
+          modelId: pickInitialModel(models),
+          isDemo: true,
+        }}
+        models={models}
         versions={getDemoVersions(REVIEW_GAME)}
         initial={demoSnapshot(scenario)}
         resumeBuild={scenario === "building"}
@@ -47,7 +59,6 @@ export default async function GamePage({ params, searchParams }: Props) {
     );
   }
 
-  const user = await ensureUser();
   const game = await requireGameAccessFor(gameId, user.id, "write").catch((error: unknown) => {
     if (error instanceof GameNotFoundError) notFound();
     throw error;
@@ -64,13 +75,21 @@ export default async function GamePage({ params, searchParams }: Props) {
     build: game.currentVersion > 0 ? { status: "ready", version: game.currentVersion } : { status: "empty" },
     activity: { state: "idle" },
   };
-  const workspaceGame: WorkspaceGame = { id: game.id, title: game.title, visibility: game.visibility, isDemo: false };
+  const workspaceGame: WorkspaceGame = {
+    id: game.id,
+    title: game.title,
+    visibility: game.visibility,
+    // Keep the saved choice even if it is locked right now: the picker shows why.
+    modelId: game.modelId ?? pickInitialModel(models),
+    isDemo: false,
+  };
 
   return (
     <Workspace
       key={game.id}
       game={workspaceGame}
       versions={versions.map(toGameVersion)}
+      models={models}
       initial={initial}
       autoPrompt={pending}
       initialPanel={initialPanel}

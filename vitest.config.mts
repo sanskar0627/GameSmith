@@ -29,6 +29,13 @@ export default defineConfig({
     env: {
       DATABASE_URL: TEST_DATABASE_URL,
       TEST_DATABASE_URL,
+      // Test-only keyring (two versions, so rotation is exercised). Not a secret.
+      KEY_ENCRYPTION_KEYS: `2:${Buffer.alloc(32, 2).toString("base64")},1:${Buffer.alloc(32, 1).toString("base64")}`,
+      // Platform keys are opted into per test with vi.stubEnv.
+      PLATFORM_ANTHROPIC_API_KEY: "",
+      PLATFORM_OPENAI_API_KEY: "",
+      PLATFORM_OPENROUTER_API_KEY: "",
+      PLATFORM_FAL_KEY: "",
     },
   },
 });
