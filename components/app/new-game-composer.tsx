@@ -3,9 +3,11 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp } from "lucide-react";
+import { ModelPicker } from "@/components/ai/model-picker";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Textarea } from "@/components/ui/textarea";
+import type { ModelOption } from "@/lib/ai/models";
 import { createGameAction } from "@/lib/server/games/actions";
 
 const IDEAS = [
@@ -29,10 +31,15 @@ const IDEA_PROMPTS: Record<string, string> = {
  */
 export function NewGameComposer({
   initialPrompt = "",
+  models,
+  initialModel,
 }: {
   initialPrompt?: string;
+  models: ModelOption[];
+  initialModel: string;
 }) {
   const [value, setValue] = useState(initialPrompt);
+  const [model, setModel] = useState(initialModel);
   const router = useRouter();
   const ref = useRef<HTMLTextAreaElement>(null);
   const [pending, startTransition] = useTransition();
@@ -43,7 +50,7 @@ export function NewGameComposer({
     if (empty || pending) return;
     setError(null);
     startTransition(async () => {
-      const result = await createGameAction(value);
+      const result = await createGameAction(value, model);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -86,7 +93,8 @@ export function NewGameComposer({
           className="min-h-24 resize-none border-0 bg-transparent px-2.5 text-[15px] shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
         <div className="flex items-center justify-between gap-2 px-1 pt-1">
-          <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+          <ModelPicker options={models} value={model} onChange={setModel} disabled={pending} side="bottom" />
+          <span className="ml-auto hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
             <Kbd>⌘</Kbd>
             <Kbd>Enter</Kbd>
             <span className="ml-1">to forge</span>
@@ -96,7 +104,7 @@ export function NewGameComposer({
             variant="ember"
             size="sm"
             disabled={empty || pending}
-            className="ml-auto"
+            className="ml-auto shrink-0 sm:ml-0"
           >
             {pending ? "Forging…" : "Forge"} <ArrowUp data-icon="inline-end" />
           </Button>
