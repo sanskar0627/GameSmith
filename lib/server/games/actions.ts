@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 
+import { isModelId } from "@/lib/ai/models";
 import type { GameCard, GameVisibility } from "@/lib/games/types";
 import { ensureUser } from "@/lib/server/users";
 
@@ -13,6 +14,7 @@ import {
   PROMPT_MAX,
   renameGame,
   restoreGame,
+  setGameModel,
   setGameVisibility,
   softDeleteGame,
   TITLE_MAX,
@@ -32,6 +34,7 @@ const gameId = z.string().uuid();
 const title = z.string().trim().min(1, "Give it a name").max(TITLE_MAX, `Keep it under ${TITLE_MAX} characters`);
 const prompt = z.string().trim().min(1, "Describe your game first").max(PROMPT_MAX, "That prompt is too long");
 const visibility = z.enum(["private", "link"]);
+const modelId = z.string().refine(isModelId, "That model isn't available");
 
 async function run<T>(label: string, fn: (userId: string) => Promise<T>): Promise<ActionResult<T>> {
   const user = await ensureUser();
@@ -45,9 +48,10 @@ async function run<T>(label: string, fn: (userId: string) => Promise<T>): Promis
   }
 }
 
-export async function createGameAction(input: string): Promise<ActionResult<{ id: string }>> {
+export async function createGameAction(input: string, model?: string): Promise<ActionResult<{ id: string }>> {
   return run("create", async (userId) => {
-    const game = await createGame(userId, prompt.parse(input));
+    const chosen = model === undefined ? null : modelId.parse(model);
+    const game = await createGame(userId, prompt.parse(input), undefined, chosen);
     refresh();
     return { id: game.id };
   });
@@ -90,5 +94,12 @@ export async function duplicateGameAction(id: string): Promise<ActionResult<Game
     const game = await duplicateGame(userId, gameId.parse(id));
     refresh();
     return toGameCard(game);
+  });
+}
+
+export async function setGameModelAction(id: string, model: string): Promise<ActionResult<{ modelId: string }>> {
+  return run("model", async (userId) => {
+    await setGameModel(userId, gameId.parse(id), modelId.parse(model));
+    return { modelId: model };
   });
 }

@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 
+import { isModelId } from "@/lib/ai/models";
 import { db, type Executor } from "@/lib/db";
 import { gameVersions, games, messages, type Game, type GameVersionRow, type MessageRow } from "@/lib/db/schema";
 import type { GameCard, GameSummary, GameVersion, GameVisibility } from "@/lib/games/types";
@@ -109,14 +110,23 @@ export async function listMessages(gameId: string, database: Executor = db()): P
 
 /* --- Writes -------------------------------------------------------------- */
 
-/** Creates a draft game from the first prompt, which becomes its first message. */
-export async function createGame(ownerId: string, prompt: string, database: Executor = db()): Promise<Game> {
+/**
+ * Creates a draft game from the first prompt, which becomes its first
+ * message. `modelId` must be a catalog id (callers validate); null keeps the default.
+ */
+export async function createGame(
+  ownerId: string,
+  prompt: string,
+  database: Executor = db(),
+  modelId: string | null = null,
+): Promise<Game> {
   const text = prompt.trim().slice(0, PROMPT_MAX);
   if (!text) throw new Error("Prompt is empty");
+  if (modelId !== null && !isModelId(modelId)) throw new RangeError("Unknown model");
   return database.transaction(async (tx) => {
     const [game] = await tx
       .insert(games)
-      .values({ ownerId, title: titleFromPrompt(text), pitch: text.slice(0, PITCH_MAX) })
+      .values({ ownerId, title: titleFromPrompt(text), pitch: text.slice(0, PITCH_MAX), modelId })
       .returning();
     await tx.insert(messages).values({ gameId: game.id, role: "user", parts: [{ type: "text", text }] });
     return game;
@@ -161,6 +171,12 @@ export async function setGameVisibility(
   database: Executor = db(),
 ) {
   return updateOwned(ownerId, gameId, { visibility }, database);
+}
+
+/** The model the agent uses for this game's next runs. */
+export async function setGameModel(ownerId: string, gameId: string, modelId: string, database: Executor = db()) {
+  if (!isModelId(modelId)) throw new RangeError("Unknown model");
+  return updateOwned(ownerId, gameId, { modelId }, database);
 }
 
 /** Moves a game out of the library. `restoreGame` brings it back. */

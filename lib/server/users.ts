@@ -7,7 +7,7 @@ import { cache } from "react";
 import { requireUser } from "@/lib/auth";
 import { db, type Executor } from "@/lib/db";
 import { explainDbError } from "@/lib/db/errors";
-import { users, type User } from "@/lib/db/schema";
+import { providerKeys, users, type User } from "@/lib/db/schema";
 
 /** The subset of a Clerk user that GameSmith stores. */
 export type UserProfile = {
@@ -63,12 +63,16 @@ export async function upsertUser(profile: UserProfile, database: Executor = db()
     });
 }
 
-/** Marks a user deleted and clears personal fields. Their games are kept for now. */
+/**
+ * Marks a user deleted, clears personal fields and destroys their saved
+ * provider keys. Their games are kept for now (cleanup job, Phase 12).
+ */
 export async function softDeleteUser(id: string, database: Executor = db()): Promise<void> {
   await database
     .update(users)
     .set({ email: null, name: null, imageUrl: null, deletedAt: new Date() })
     .where(and(eq(users.id, id), isNull(users.deletedAt)));
+  await database.delete(providerKeys).where(eq(providerKeys.userId, id));
 }
 
 export async function getUserById(id: string, database: Executor = db()): Promise<User | null> {
