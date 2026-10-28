@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
@@ -18,8 +19,8 @@ import type { Attachment, MessagePart } from "@/lib/workspace/types";
  * GameSmith database schema (Postgres 18, Drizzle).
  *
  * Phase 2 tables: users, games, game_versions, messages, webhook_events.
- * Later phases add provider_keys, agent_runs, wallets, spark_ledger,
- * purchases and sandboxes (see docs/architecture.md).
+ * Phase 5: provider_keys. Later phases add agent_runs, wallets,
+ * spark_ledger, purchases and sandboxes (see docs/architecture.md).
  *
  * Change this file, then run `npm run db:generate` and commit the SQL
  * migration it writes to ./drizzle.
@@ -31,6 +32,9 @@ export const gameStatusEnum = pgEnum("game_status", ["draft", "building", "ready
 export const gameVisibilityEnum = pgEnum("game_visibility", ["private", "link"]);
 export const versionStatusEnum = pgEnum("version_status", ["ready", "error"]);
 export const messageRoleEnum = pgEnum("message_role", ["user", "assistant"]);
+// Mirrors PROVIDERS in lib/ai/models.ts.
+export const providerEnum = pgEnum("provider", ["anthropic", "openai", "openrouter", "fal"]);
+export const keyStatusEnum = pgEnum("key_status", ["valid", "invalid", "unverified"]);
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () =>
@@ -70,7 +74,7 @@ export const games = pgTable(
       .default(sql`floor(random() * 2147483647)::int`),
     /** Latest playable version number (0 = nothing built yet). */
     currentVersion: integer("current_version").notNull().default(0),
-    /** Model chosen in the composer (catalog id, Phase 5). */
+    /** Model chosen in the composer (catalog id from lib/ai/models.ts). Null = default. */
     modelId: text("model_id"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -131,9 +135,43 @@ export const webhookEvents = pgTable("webhook_events", {
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Bring-your-own provider keys. The key itself is only ever stored
+ * encrypted (AES-256-GCM, lib/crypto/keyring.ts) with additional data bound
+ * to user + provider, so a ciphertext copied to another row will not decrypt.
+ */
+export const providerKeys = pgTable(
+  "provider_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: providerEnum("provider").notNull(),
+    ciphertext: text("ciphertext").notNull(),
+    iv: text("iv").notNull(),
+    tag: text("tag").notNull(),
+    /** Keyring version that encrypted this row (for rotation). */
+    keyVersion: integer("key_version").notNull(),
+    /** Last four characters, the only part ever shown. */
+    last4: text("last4").notNull(),
+    status: keyStatusEnum("status").notNull().default("unverified"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    /** When off, runs use platform credits even though a key is saved. */
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("provider_keys_user_provider_uq").on(t.userId, t.provider),
+    check("provider_keys_last4_length", sql`char_length(${t.last4}) <= 4`),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Game = typeof games.$inferSelect;
 export type NewGame = typeof games.$inferInsert;
 export type GameVersionRow = typeof gameVersions.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
+export type ProviderKeyRow = typeof providerKeys.$inferSelect;
