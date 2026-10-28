@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Code2, History, Share2 } from "lucide-react";
+import { ModelPicker } from "@/components/ai/model-picker";
 import { PageHeader } from "@/components/app/page-header";
 import { Spark } from "@/components/brand/spark";
 import { ShareDialog } from "@/components/games/game-dialogs";
@@ -21,9 +22,10 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import type { ModelOption } from "@/lib/ai/models";
 import type { GameVersion, GameVisibility } from "@/lib/games/types";
 import type { BriefPart, WorkspaceSnapshot } from "@/lib/workspace/types";
-import { setVisibilityAction } from "@/lib/server/games/actions";
+import { setGameModelAction, setVisibilityAction } from "@/lib/server/games/actions";
 import { cn } from "@/lib/utils";
 import { ChatThread } from "./chat/chat-thread";
 import { Composer } from "./chat/composer";
@@ -39,6 +41,8 @@ export type WorkspaceGame = {
   id: string;
   title: string;
   visibility: GameVisibility;
+  /** Catalog model id the agent uses for this game. */
+  modelId: string;
   isDemo: boolean;
 };
 
@@ -49,8 +53,11 @@ export function Workspace({
   autoPrompt,
   resumeBuild = false,
   initialPanel,
+  models,
 }: {
   game: WorkspaceGame;
+  /** Model picker options for this user (see listModelOptions). */
+  models: ModelOption[];
   versions: GameVersion[];
   /** Thread and build state to start from (saved messages, or a review fixture). */
   initial: WorkspaceSnapshot;
@@ -68,7 +75,21 @@ export function Workspace({
   const [historyOpen, setHistoryOpen] = useState(initialPanel === "versions");
   const [shareOpen, setShareOpen] = useState(false);
   const [visibility, setVisibility] = useState(game.visibility);
+  const [modelId, setModelId] = useState(game.modelId);
   const [, startTransition] = useTransition();
+
+  const changeModel = (next: string) => {
+    const previous = modelId;
+    setModelId(next);
+    if (game.isDemo) return;
+    startTransition(async () => {
+      const result = await setGameModelAction(game.id, next);
+      if (!result.ok) {
+        setModelId(previous);
+        toast.add({ type: "error", title: "Couldn’t switch models", description: result.error });
+      }
+    });
+  };
 
   const changeVisibility = (next: GameVisibility) => {
     const previous = visibility;
@@ -138,6 +159,7 @@ export function Workspace({
         crash={crash}
         onSend={send}
         onStop={stop}
+        tools={<ModelPicker options={models} value={modelId} onChange={changeModel} disabled={busy} />}
       />
     </div>
   );
