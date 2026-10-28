@@ -13,6 +13,7 @@ import {
   listVersions,
   renameGame,
   restoreGame,
+  setGameModel,
   setGameVisibility,
   softDeleteGame,
   titleFromPrompt,
@@ -62,6 +63,26 @@ describe("createGame", () => {
   it("rejects an empty prompt", async () => {
     await createUser("user_a");
     await expect(createGame("user_a", "   ")).rejects.toThrow();
+  });
+});
+
+describe("model choice", () => {
+  it("stores the composer's model on create and on change, owner only", async () => {
+    await createUser("user_a");
+    await createUser("user_b");
+    const game = await createGame("user_a", "A tiny space trader", undefined, "openai/gpt-6.1-sol");
+    expect(game.modelId).toBe("openai/gpt-6.1-sol");
+    expect((await setGameModel("user_a", game.id, "anthropic/claude-haiku-5-5")).modelId).toBe(
+      "anthropic/claude-haiku-5-5",
+    );
+    await expect(setGameModel("user_b", game.id, "openai/gpt-6-luna")).rejects.toBeInstanceOf(GameNotFoundError);
+  });
+
+  it("rejects ids outside the catalog", async () => {
+    await createUser("user_a");
+    const game = await insertGame("user_a");
+    await expect(setGameModel("user_a", game.id, "openai/gpt-2")).rejects.toThrow(RangeError);
+    await expect(createGame("user_a", "Prompt", undefined, "nope")).rejects.toThrow(RangeError);
   });
 });
 

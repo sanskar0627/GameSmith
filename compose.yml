@@ -1,5 +1,4 @@
-# Local development services. Production gets its own compose file (Phase 12).
-#
+
 #   npm run db:up      start Postgres and wait until it is healthy
 #   npm run db:down    stop it (data is kept in the `pgdata` volume)
 name: gamesmith

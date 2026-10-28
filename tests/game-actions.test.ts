@@ -20,6 +20,7 @@ import {
   duplicateGameAction,
   renameGameAction,
   restoreGameAction,
+  setGameModelAction,
   setVisibilityAction,
 } from "@/lib/server/games/actions";
 import { listGames } from "@/lib/server/games/queries";
@@ -75,6 +76,27 @@ describe("game server actions", () => {
     }
     expect((await listGames("user_a"))[0]).toMatchObject({ title: "Mine", visibility: "private" });
     expect(await listGames("user_b")).toHaveLength(0);
+  });
+
+  it("creates with a chosen model and changes it, validating the id", async () => {
+    await createUser("user_a");
+    clerk.userId = "user_a";
+    const created = await createGameAction("Pinball on the moon", "anthropic/claude-opus-5-5");
+    expect(created.ok).toBe(true);
+    const [game] = await listGames("user_a");
+    expect(game.modelId).toBe("anthropic/claude-opus-5-5");
+    expect(await setGameModelAction(game.id, "openai/gpt-6-luna")).toEqual({
+      ok: true,
+      data: { modelId: "openai/gpt-6-luna" },
+    });
+    expect(await setGameModelAction(game.id, "made/up")).toEqual({ ok: false, error: "That model isn't available" });
+    expect(await createGameAction("Another", "made/up")).toEqual({ ok: false, error: "That model isn't available" });
+    clerk.userId = "user_b";
+    await createUser("user_b");
+    expect(await setGameModelAction(game.id, "openai/gpt-6-luna")).toEqual({
+      ok: false,
+      error: "That game no longer exists.",
+    });
   });
 
   it("deletes with undo", async () => {

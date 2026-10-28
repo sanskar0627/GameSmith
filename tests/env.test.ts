@@ -37,4 +37,26 @@ describe("serverEnv", () => {
     vi.stubEnv("DATABASE_URL", "mysql://u:p@localhost/app");
     expect(await loadEnv()).toThrow(/postgres:\/\//);
   });
+
+  it("requires an encryption keyring in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DATABASE_URL", "postgres://u:p@db.example:5432/app");
+    vi.stubEnv("KEY_ENCRYPTION_KEYS", "");
+    expect(await loadEnv()).toThrow(/KEY_ENCRYPTION_KEYS/);
+    vi.stubEnv("KEY_ENCRYPTION_KEYS", "1:tooshort");
+    expect(await loadEnv()).toThrow(/32 bytes/);
+  });
+
+  it("uses a fixed development keyring outside production, with a warning", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("KEY_ENCRYPTION_KEYS", "");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect((await loadEnv())().KEY_ENCRYPTION_KEYS).toMatch(/^0:/);
+    expect(warn.mock.calls.flat().join(" ")).toMatch(/KEY_ENCRYPTION_KEYS/);
+  });
+
+  it("treats blank platform keys as unset", async () => {
+    vi.stubEnv("PLATFORM_OPENAI_API_KEY", "   ");
+    expect((await loadEnv())().PLATFORM_OPENAI_API_KEY).toBeUndefined();
+  });
 });
