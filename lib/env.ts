@@ -42,6 +42,16 @@ const schema = z.object({
   PLATFORM_OPENAI_API_KEY: optionalSecret,
   PLATFORM_OPENROUTER_API_KEY: optionalSecret,
   PLATFORM_FAL_KEY: optionalSecret,
+  // Payments (Polar). All optional: without them the billing page works but
+  // checkout says payments aren't set up.
+  POLAR_ACCESS_TOKEN: optionalSecret,
+  POLAR_WEBHOOK_SECRET: optionalSecret,
+  POLAR_SERVER: z.enum(["sandbox", "production"]).default("sandbox"),
+  POLAR_PRODUCT_FORGE: optionalSecret,
+  POLAR_PRODUCT_STUDIO: optionalSecret,
+  POLAR_PRODUCT_PACK_5K: optionalSecret,
+  POLAR_PRODUCT_PACK_25K: optionalSecret,
+  NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
