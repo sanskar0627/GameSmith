@@ -5,8 +5,8 @@ import { WelcomeDialog } from "@/components/app/welcome-dialog";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { demoUsage } from "@/lib/billing/mock";
 import type { GameSummary } from "@/lib/games/types";
+import { getUsageSummary } from "@/lib/server/billing/summary";
 import { listRecentGames, toGameSummary } from "@/lib/server/games/queries";
 import { ensureUser } from "@/lib/server/users";
 
@@ -19,11 +19,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await ensureUser();
   // Restore the sidebar's open/collapsed state without a layout jump.
   const sidebarOpen = (await cookies()).get("sidebar_state")?.value !== "false";
-  const recentGames: GameSummary[] = (await listRecentGames(user.id)).map(toGameSummary);
-
-  // TODO(data): the user's metered usage for this billing cycle.
-  const { used, allowance } = demoUsage();
-  const sparks = { used, allowance };
+  const [recent, usage] = await Promise.all([listRecentGames(user.id), getUsageSummary(user.id)]);
+  const recentGames: GameSummary[] = recent.map(toGameSummary);
+  const sparks = { used: usage.used, allowance: usage.allowance, extra: usage.purchased };
 
   return (
     <TooltipProvider>

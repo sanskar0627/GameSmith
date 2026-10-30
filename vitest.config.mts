@@ -36,6 +36,13 @@ export default defineConfig({
       PLATFORM_OPENAI_API_KEY: "",
       PLATFORM_OPENROUTER_API_KEY: "",
       PLATFORM_FAL_KEY: "",
+      // Polar: fake product ids and a real-format webhook secret for signed test deliveries.
+      POLAR_ACCESS_TOKEN: "",
+      POLAR_WEBHOOK_SECRET: `whsec_${Buffer.alloc(24, 7).toString("base64")}`,
+      POLAR_PRODUCT_FORGE: "prod_forge",
+      POLAR_PRODUCT_STUDIO: "prod_studio",
+      POLAR_PRODUCT_PACK_5K: "prod_pack_5k",
+      POLAR_PRODUCT_PACK_25K: "prod_pack_25k",
     },
   },
 });

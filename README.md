@@ -124,6 +124,12 @@ Users can save their own Anthropic, OpenAI, OpenRouter and Fal keys in Settings 
 
 To rotate the encryption key, put a new entry first in `KEY_ENCRYPTION_KEYS` and keep the old one after it (`2:<new>,1:<old>`). Saved keys are re-encrypted as they are next used.
 
+### Sparks and payments
+
+Agent work is paid in sparks (see [`lib/billing/pricing.ts`](lib/billing/pricing.ts) for plans, packs and the spark rate). Each user has a wallet with a monthly allowance and pack sparks; every change is a row in the append-only `spark_ledger`, written in the same transaction and keyed for idempotency. A run holds sparks when it starts and settles actual usage when it ends ([`lib/server/billing/runs.ts`](lib/server/billing/runs.ts)).
+
+Payments go through [Polar](https://polar.sh). Create one product per offer (Forge and Studio monthly subscriptions, two sparks packs), put their ids and an organization access token in the `POLAR_*` variables, and add a webhook to `<app url>/api/webhooks/polar` for `order.paid`, `order.refunded` and the `subscription.*` events. Sparks are only granted by the verified webhook. Use `POLAR_SERVER=sandbox` until you go live.
+
 ### User sync
 
 User rows are kept in sync two ways:
