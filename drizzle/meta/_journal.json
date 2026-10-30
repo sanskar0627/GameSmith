@@ -15,6 +15,13 @@
       "when": 1791656706424,
       "tag": "0001_provider_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791663728562,
+      "tag": "0002_billing",
+      "breakpoints": true
     }
   ]
 }
