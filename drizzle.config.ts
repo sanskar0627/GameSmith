@@ -1,7 +1,7 @@
 import { loadEnvConfig } from "@next/env";
 import { defineConfig } from "drizzle-kit";
 
-import { DEV_DATABASE_URL } from "./lib/db/dev-url";
+import { devDatabaseUrl } from "./lib/db/dev-url";
 
 // Load .env.local (and friends) the same way Next.js does.
 loadEnvConfig(process.cwd());
@@ -11,7 +11,8 @@ if (!url) {
   if (process.env.NODE_ENV === "production") {
     throw new Error("DATABASE_URL is not set.");
   }
-  url = DEV_DATABASE_URL;
+  url = devDatabaseUrl();
+  if (!url) throw new Error("Set DATABASE_URL, or POSTGRES_PASSWORD for the local database, in .env.local.");
   console.warn(`[drizzle] DATABASE_URL is not set; using the local compose database (${url.replace(/:[^:@/]+@/, ":***@")}).`);
 }
 

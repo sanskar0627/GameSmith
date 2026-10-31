@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:up": "docker compose up -d --wait postgres",
-    "db:down": "docker compose down",
+    "db:up": "docker compose --env-file .env.local up -d --wait postgres",
+    "db:down": "docker compose --env-file .env.local down",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"

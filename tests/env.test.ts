@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DEV_DATABASE_URL } from "@/lib/db/dev-url";
 
 // serverEnv() caches its result, so each case loads a fresh copy of the module.
 async function loadEnv() {
@@ -22,9 +21,17 @@ describe("serverEnv", () => {
   it("falls back to the local compose database in development, with a warning", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("POSTGRES_PASSWORD", "p@ss word");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect((await loadEnv())().DATABASE_URL).toBe(DEV_DATABASE_URL);
+    expect((await loadEnv())().DATABASE_URL).toBe("postgres://gamesmith:p%40ss%20word@localhost:5432/gamesmith");
     expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("explains what to set when there is neither DATABASE_URL nor a local password", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("POSTGRES_PASSWORD", "");
+    expect(await loadEnv()).toThrow(/POSTGRES_PASSWORD/);
   });
 
   it("refuses to start in production without DATABASE_URL", async () => {

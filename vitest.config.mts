@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import nextEnv from "@next/env";
@@ -6,8 +7,24 @@ import { defineConfig } from "vitest/config";
 // Loads .env.test / .env.test.local (Next.js rules: .env.local is skipped in test).
 nextEnv.loadEnvConfig(process.cwd());
 
+// The local database password lives in .env.local (shared with `npm run db:up`).
+function localPostgresPassword(): string | undefined {
+  if (process.env.POSTGRES_PASSWORD) return process.env.POSTGRES_PASSWORD;
+  if (!existsSync(".env.local")) return undefined;
+  const line = readFileSync(".env.local", "utf8")
+    .split(/\r?\n/)
+    .find((l) => l.startsWith("POSTGRES_PASSWORD="));
+  return line?.slice("POSTGRES_PASSWORD=".length).trim().replace(/^["']|["']$/g, "") || undefined;
+}
+
+// Same shape as lib/db/dev-url.ts (not imported: config files load before the TS toolchain).
+const password = localPostgresPassword();
 const TEST_DATABASE_URL =
-  process.env.TEST_DATABASE_URL ?? "postgres://gamesmith:gamesmith@localhost:5432/gamesmith_test";
+  process.env.TEST_DATABASE_URL ??
+  (password ? `postgres://gamesmith:${encodeURIComponent(password)}@localhost:5432/gamesmith_test` : undefined);
+if (!TEST_DATABASE_URL) {
+  throw new Error("Set POSTGRES_PASSWORD (or TEST_DATABASE_URL) in .env.local before running tests.");
+}
 // Visible to globalSetup (main process) as well as to the test workers below.
 process.env.TEST_DATABASE_URL = TEST_DATABASE_URL;
 

@@ -5,14 +5,14 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 
 import { parseKeyring } from "@/lib/crypto/keyring";
-import { DEV_DATABASE_URL } from "@/lib/db/dev-url";
+import { devDatabaseUrl } from "@/lib/db/dev-url";
 
 /**
  * Server environment, validated on first use (not at import time, so
  * `next build` works without production secrets present).
  *
  * Outside production, a missing DATABASE_URL falls back to the local
- * compose database, and a missing KEY_ENCRYPTION_KEYS to a fixed dev key,
+ * compose database (built from POSTGRES_PASSWORD), and a missing KEY_ENCRYPTION_KEYS to a fixed dev key,
  * each with a warning. In production both are hard errors.
  *
  * Platform AI keys use PLATFORM_* names on purpose: the AI SDK reads
@@ -26,7 +26,9 @@ const optionalSecret = z
 
 const schema = z.object({
   DATABASE_URL: z
-    .string({ error: "DATABASE_URL is not set. Add it to .env.local (see .env.example)." })
+    .string({
+      error: "DATABASE_URL is not set. Add it, or POSTGRES_PASSWORD for the local database, to .env.local (see .env.example).",
+    })
     .refine((v) => /^postgres(ql)?:\/\//.test(v), "DATABASE_URL must be a postgres:// URL"),
   CLERK_WEBHOOK_SIGNING_SECRET: z.string().min(1).optional(),
   KEY_ENCRYPTION_KEYS: z
@@ -64,11 +66,17 @@ export function serverEnv(): ServerEnv {
 
   const input: Record<string, string | undefined> = { ...process.env };
   if (!input.DATABASE_URL && input.NODE_ENV !== "production") {
-    input.DATABASE_URL = DEV_DATABASE_URL;
-    console.warn(
-      "[env] DATABASE_URL is not set; using the local compose database. Add DATABASE_URL to .env.local to silence this.",
-    );
+    const local = devDatabaseUrl("gamesmith", input);
+    if (local) {
+      input.DATABASE_URL = local;
+      console.warn(
+        "[env] DATABASE_URL is not set; using the local compose database. Add DATABASE_URL to .env.local to silence this.",
+      );
+    }
   }
+
+  // An empty value means "not set", so the error says what to add.
+  if (!input.DATABASE_URL) delete input.DATABASE_URL;
 
   if (!input.KEY_ENCRYPTION_KEYS && input.NODE_ENV !== "production") {
     input.KEY_ENCRYPTION_KEYS = DEV_KEYRING;

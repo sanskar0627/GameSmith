@@ -51,6 +51,8 @@ node -e "console.log('1:' + require('crypto').randomBytes(32).toString('base64')
 
 To offer models paid with sparks, set the `PLATFORM_*` provider keys. Without them, users can still run models with their own keys (Settings > API keys).
 
+Choose a password for the local database and put it in `.env.local` as `POSTGRES_PASSWORD` (any random string; `openssl rand -hex 16` works). Compose, the app and the tests all read it from there, so no password is committed.
+
 Start Postgres and apply the database migrations:
 
 ```bash
