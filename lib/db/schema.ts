@@ -20,8 +20,7 @@ import type { Attachment, MessagePart } from "@/lib/workspace/types";
  *
  * Phase 2 tables: users, games, game_versions, messages, webhook_events.
  * Phase 5: provider_keys. Phase 6: wallets, spark_ledger, purchases,
- * subscriptions, agent_runs. Later phases add sandboxes (see
- * docs/architecture.md).
+ * subscriptions, agent_runs. Phase 7: sandboxes (see docs/architecture.md).
  *
  * Change this file, then run `npm run db:generate` and commit the SQL
  * migration it writes to ./drizzle.
@@ -322,6 +321,21 @@ export const agentRuns = pgTable(
     ),
   ],
 );
+
+/**
+ * Last known state of each game's sandbox, as seen by the app. The sandbox
+ * manager is the source of truth for what is running; this row records
+ * when it started and stopped for the UI and housekeeping.
+ */
+export const sandboxes = pgTable("sandboxes", {
+  gameId: uuid("game_id")
+    .primaryKey()
+    .references(() => games.id, { onDelete: "cascade" }),
+  status: text("status").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  stoppedAt: timestamp("stopped_at", { withTimezone: true }),
+  updatedAt: updatedAt(),
+});
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

@@ -54,6 +54,11 @@ const schema = z.object({
   POLAR_PRODUCT_PACK_5K: optionalSecret,
   POLAR_PRODUCT_PACK_25K: optionalSecret,
   NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
+  // Game sandboxes (sandbox/manager). Optional: without them, sandbox
+  // endpoints answer 503 "not set up".
+  SANDBOX_MANAGER_URL: z.url().optional(),
+  SANDBOX_MANAGER_TOKEN: optionalSecret,
+  SANDBOX_PREVIEW_ORIGIN: z.url().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
