@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 // Every test starts from empty tables.
 beforeEach(async () => {
-  await db().execute(sql`truncate table users, games, game_versions, messages, webhook_events, provider_keys, wallets, spark_ledger, purchases, subscriptions, agent_runs cascade`);
+  await db().execute(sql`truncate table users, games, game_versions, messages, webhook_events, provider_keys, wallets, spark_ledger, purchases, subscriptions, agent_runs, sandboxes cascade`);
 });
 
 afterAll(async () => {
