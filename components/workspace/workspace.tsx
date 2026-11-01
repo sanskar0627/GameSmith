@@ -290,6 +290,8 @@ function WorkspaceView({
         title={title}
         visibility={visibility}
         onVisibilityChange={changeVisibility}
+        version={versions.reduce((n, v) => Math.max(n, v.version), build.status === "ready" ? build.version : 0)}
+        demo={game.isDemo}
       />
 
       {isMobile ? (

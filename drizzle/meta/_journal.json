@@ -36,6 +36,13 @@
       "when": 1792166986664,
       "tag": "0004_agent_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793562399891,
+      "tag": "0005_publishing",
+      "breakpoints": true
     }
   ]
 }

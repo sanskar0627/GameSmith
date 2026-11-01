@@ -15,4 +15,6 @@ fi
 
 # --base wins over vite.config.ts, so the preview keeps working even if the
 # game's config is edited.
-exec /opt/template/node_modules/.bin/vite --host 0.0.0.0 --port 5173 --strictPort --base "${GS_BASE:-/}"
+# The config is loaded in-process (--configLoader runner): the default loader
+# writes a temp file into node_modules, which is read-only here.
+exec /opt/template/node_modules/.bin/vite --configLoader runner --host 0.0.0.0 --port 5173 --strictPort --base "${GS_BASE:-/}"

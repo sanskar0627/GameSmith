@@ -9,10 +9,11 @@ import { Spark } from "@/components/brand/spark";
 import { buttonVariants } from "@/components/ui/button";
 import { getShowcaseGame } from "@/lib/games/mock";
 import { GameNotFoundError, requireGameAccessFor } from "@/lib/server/games/access";
+import { playableBuild } from "@/lib/server/publish/service";
 
 type Props = { params: Promise<{ gameId: string }> };
 
-type Playable = { title: string; pitch: string; build: string | null };
+type Playable = { title: string; pitch: string; build: string | null; owner: boolean; external: boolean };
 
 /**
  * Who may play: anyone for a link-shared game, the owner for a private one,
@@ -21,13 +22,14 @@ type Playable = { title: string; pitch: string; build: string | null };
  */
 const loadPlayable = cache(async (gameId: string): Promise<Playable | null> => {
   const showcase = getShowcaseGame(gameId);
-  if (showcase) return { title: showcase.title, pitch: showcase.pitch, build: "/preview-demo.html" };
+  if (showcase) return { title: showcase.title, pitch: showcase.pitch, build: "/preview-demo.html", owner: false, external: false };
 
   const { userId } = await auth();
   try {
     const game = await requireGameAccessFor(gameId, userId ?? null, "read");
-    // Published builds are served from the content domain in Phase 11.
-    return { title: game.title, pitch: game.pitch, build: null };
+    // Published builds come from the content origin, never this one.
+    const owner = userId === game.ownerId;
+    return { title: game.title, pitch: game.pitch, build: playableBuild(game, userId ?? null), owner, external: true };
   } catch (error) {
     if (error instanceof GameNotFoundError) return null;
     throw error;
@@ -43,7 +45,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /** Public play page. Players see the game, never the chat or the source. */
 export default async function PlayPage({ params }: Props) {
-  const game = await loadPlayable((await params).gameId);
+  const { gameId } = await params;
+  const game = await loadPlayable(gameId);
   if (!game) notFound();
 
   return (
@@ -66,7 +69,9 @@ export default async function PlayPage({ params }: Props) {
           <iframe
             src={game.build}
             title={`${game.title}, playable`}
-            sandbox="allow-scripts allow-pointer-lock"
+            // The content origin is a different site, so allow-same-origin only
+            // gives the game its own origin (for localStorage saves), never ours.
+            sandbox={game.external ? "allow-scripts allow-same-origin allow-pointer-lock" : "allow-scripts allow-pointer-lock"}
             allow="fullscreen; gamepad; autoplay"
             className="size-full rounded-xl border-0 bg-night ring-1 ring-border"
           />
@@ -75,8 +80,15 @@ export default async function PlayPage({ params }: Props) {
             <Spark size={21} className="text-muted-foreground" />
             <p className="mt-4 font-display text-display-sm">Not ready to play yet.</p>
             <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-              This game hasn&rsquo;t been published. Check back once its maker ships a build.
+              {game.owner
+                ? "Publish it from the workspace (Share, then Publish) and it plays here."
+                : "This game hasn\u2019t been published. Check back once its maker ships a build."}
             </p>
+            {game.owner && (
+              <Link href={`/g/${gameId}`} className={buttonVariants({ variant: "outline", size: "sm", className: "mt-4" })}>
+                Open the workspace
+              </Link>
+            )}
           </div>
         )}
       </div>

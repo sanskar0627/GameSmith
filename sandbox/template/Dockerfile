@@ -9,8 +9,8 @@ RUN npm ci --no-audit --no-fund && npm cache clean --force
 COPY files/ ./files/
 COPY entrypoint.sh /usr/local/bin/gs-entrypoint
 # File operations the manager runs inside the sandbox via `docker exec`.
-COPY fsop.mjs /opt/gs/fsop.mjs
-RUN chmod 0555 /usr/local/bin/gs-entrypoint && chmod 0444 /opt/gs/fsop.mjs \
+COPY fsop.mjs build.mjs /opt/gs/
+RUN chmod 0555 /usr/local/bin/gs-entrypoint && chmod 0444 /opt/gs/fsop.mjs /opt/gs/build.mjs \
   && rm -rf ./files/node_modules \
   && mkdir -p /workspace && chown node:node /workspace
 

@@ -67,7 +67,7 @@ export class LocalDriver implements Driver {
     const port = await freePort();
     const child = spawn(
       path.join(TEMPLATE_MODULES, ".bin/vite"),
-      ["--host", "127.0.0.1", "--port", String(port), "--strictPort", "--base", spec.base],
+      ["--configLoader", "runner", "--host", "127.0.0.1", "--port", String(port), "--strictPort", "--base", spec.base],
       { cwd: ws, env: { ...process.env, GS_BASE: spec.base, GS_HMR_CLIENT_PORT: process.env.GS_HMR_CLIENT_PORT ?? "" }, stdio: "ignore" },
     );
     this.procs.set(spec.gameId, { child, port, base: spec.base });

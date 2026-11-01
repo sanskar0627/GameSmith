@@ -57,8 +57,8 @@ export class SandboxClient {
     return res;
   }
 
-  private async json<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await this.request(method, path, body === undefined ? undefined : JSON.stringify(body));
+  private async json<T>(method: string, path: string, body?: unknown, timeoutMs?: number): Promise<T> {
+    const res = await this.request(method, path, body === undefined ? undefined : JSON.stringify(body), timeoutMs);
     return (await res.json()) as T;
   }
 
@@ -97,6 +97,16 @@ export class SandboxClient {
 
   async deleteFile(gameId: string, path: string) {
     await this.request("DELETE", `/v1/sandboxes/${gameId}/files/${encodePath(path)}`);
+  }
+
+  /** Production build of the live workspace (Phase 11 publishing). */
+  build(gameId: string) {
+    return this.json<{ files: { path: string; data: string }[] }>("POST", `/v1/sandboxes/${gameId}/build`, {}, 240_000);
+  }
+
+  /** Removes the game's container, workspace and snapshots for good. */
+  destroy(gameId: string) {
+    return this.json<{ destroyed: boolean }>("DELETE", `/v1/sandboxes/${gameId}`);
   }
 
   /** gzip tar of the game's source (Phase 8 download). */

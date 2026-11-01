@@ -7,6 +7,12 @@ import { SandboxClient } from "@/lib/server/sandbox/client";
 /** Sandbox manager stand-in: files in memory, running state, snapshots. */
 export function fakeSandbox(seed: Record<string, string> = { "package.json": "{}", "src/main.ts": "start()" }) {
   const files = new Map(Object.entries(seed));
+  /** What POST /build answers: a status and body, or files (path -> text). */
+  const build: { status: number; error?: string; files: Record<string, string> } = {
+    status: 200,
+    files: { "index.html": '<script type="module" src="./assets/index.js"></script>', "assets/index.js": "start()" },
+  };
+  const destroyed: string[] = [];
   const snapshots: string[] = [];
   let running = false;
   const calls: string[] = [];
@@ -20,6 +26,18 @@ export function fakeSandbox(seed: Record<string, string> = { "package.json": "{}
     const status = () =>
       running ? { running: true, previewPath: `/p/${m?.[1]}-secretsecretsecret/`, startedAt: 1, lastActive: 1 } : { running: false };
     if (action === "" && method === "GET") return Response.json(status());
+    if (action === "" && method === "DELETE") {
+      destroyed.push(m?.[1] ?? "");
+      running = false;
+      return Response.json({ destroyed: true });
+    }
+    if (action === "/build") {
+      if (!running) return Response.json({ error: "Sandbox is not running" }, { status: 409 });
+      if (build.status !== 200) return Response.json({ error: build.error ?? "failed" }, { status: build.status });
+      return Response.json({
+        files: Object.entries(build.files).map(([p, text]) => ({ path: p, data: Buffer.from(text).toString("base64") })),
+      });
+    }
     if (action === "/start") {
       running = true;
       return Response.json(status());
@@ -42,7 +60,15 @@ export function fakeSandbox(seed: Record<string, string> = { "package.json": "{}
     }
     return Response.json({ error: "Not found" }, { status: 404 });
   };
-  return { files, snapshots, calls, client: new SandboxClient("http://manager:4100", "token", fetchImpl), isRunning: () => running };
+  return {
+    files,
+    snapshots,
+    calls,
+    build,
+    destroyed,
+    client: new SandboxClient("http://manager:4100", "token", fetchImpl),
+    isRunning: () => running,
+  };
 }
 
 type Chunk = LanguageModelV4StreamPart;

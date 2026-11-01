@@ -29,13 +29,19 @@ const fail = (label, detail = "") => {
 };
 const check = (cond, label, detail) => (cond ? ok(label) : fail(label, detail));
 
-async function api(method, path, body) {
-  const res = await fetch(`${MANAGER}${path}`, {
-    method,
-    headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/octet-stream" },
-    body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
-  });
-  return res;
+async function api(method, path, body, retry = true) {
+  try {
+    return await fetch(`${MANAGER}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/octet-stream" },
+      body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
+    });
+  } catch (error) {
+    // The probes below block this script (execFileSync) for longer than the
+    // manager's keep-alive, so a pooled socket can be dead by the next call.
+    if (retry && error?.cause?.code === "UND_ERR_SOCKET") return api(method, path, body, false);
+    throw error;
+  }
 }
 
 /** Runs a probe inside the sandbox; returns what it printed. */
@@ -110,8 +116,32 @@ try {
   check(again.running && again.previewPath !== statusA.previewPath, "restarts with a new preview secret");
   const restored = await api("GET", `/v1/sandboxes/${a}/files/src/smoke.ts`);
   check((await restored.text()) === "export const smoke = 1;\n", "the edited file came back from the snapshot");
+
+  console.log("Publish build");
+  await api("PUT", `/v1/sandboxes/${a}/files/public/assets/dot.txt`, "asset");
+  const built = await api("POST", `/v1/sandboxes/${a}/build`, {});
+  const out = await built.json();
+  const paths = (out.files ?? []).map((f) => f.path);
+  check(built.ok && paths.includes("index.html"), "vite build runs inside the sandbox", JSON.stringify(out).slice(0, 300));
+  const index = Buffer.from(out.files?.find((f) => f.path === "index.html")?.data ?? "", "base64").toString();
+  check(/src="\.\/assets\/[^"]+\.js"/.test(index), "the build uses relative asset URLs", index.slice(0, 300));
+  check(paths.includes("assets/dot.txt"), "public/ files are copied into the build");
+  check(!index.includes("gamesmith-runtime"), "the dev-only crash reporter is not in the build");
+
+  const huge = await api("PUT", `/v1/sandboxes/${a}/files/big.bin`, "x".repeat(5 * 1024 * 1024));
+  check(huge.status === 413, "files over the size cap are refused", String(huge.status));
+
+  console.log("Delete");
+  check((await api("DELETE", `/v1/sandboxes/${b}`)).ok, "destroy B");
+  let volumeGone = false;
+  try {
+    execFileSync("docker", ["volume", "inspect", `gs-ws-${b}`], { stdio: "ignore" });
+  } catch {
+    volumeGone = true;
+  }
+  check(volumeGone, "B's workspace volume is gone");
 } catch (error) {
-  fail("unexpected error", error.message);
+  fail("unexpected error", `${error.message}${error.cause ? ` (${error.cause.code ?? error.cause.message})` : ""}`);
 } finally {
   for (const id of [a, b]) {
     await api("POST", `/v1/sandboxes/${id}/stop`, { snapshot: false }).catch(() => {});

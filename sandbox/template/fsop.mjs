@@ -17,6 +17,8 @@ import path from "node:path";
 const ROOT = process.env.GS_WORKSPACE ?? "/workspace";
 const MAX_FILE = Number(process.env.GS_MAX_FILE_BYTES ?? 4 * 1024 * 1024);
 const MAX_FILES = 5000;
+// Whole source tree (same cap as snapshots), so a runaway writer can't fill the disk.
+const MAX_WORKSPACE = Number(process.env.GS_MAX_WORKSPACE_BYTES ?? 100 * 1024 * 1024);
 // Not part of the game's source: dependencies, caches and build output.
 const SKIP = new Set(["node_modules", ".vite", "dist", ".git"]);
 
@@ -109,8 +111,31 @@ async function readStdin() {
   return Buffer.concat(chunks);
 }
 
+/** Bytes used by the source tree, without dependencies and caches. */
+async function used(skip) {
+  let total = 0;
+  let count = 0;
+  async function walk(dir, prefix) {
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (prefix === "" && SKIP.has(entry.name)) continue;
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) await walk(path.join(dir, entry.name), rel);
+      else if (entry.isFile() && rel !== skip) {
+        total += (await lstat(path.join(dir, entry.name))).size;
+        count++;
+      }
+    }
+  }
+  await walk(ROOT, "");
+  return { total, count };
+}
+
 async function write(rel) {
   const data = await readStdin();
+  const { total, count } = await used(rel);
+  if (total + data.length > MAX_WORKSPACE) throw new Fail(4, "workspace is full");
+  if (count >= MAX_FILES) throw new Fail(4, "too many files");
   await noSymlinks(rel);
   const parent = path.dirname(rel);
   if (parent !== ".") await mkdir(path.join(ROOT, parent), { recursive: true });
