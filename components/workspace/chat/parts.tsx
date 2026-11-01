@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronRight, FilePen, FilePlus, FileSearch, FileX, FolderTree, TriangleAlert, X } from "lucide-react";
+import { Check, ChevronRight, FilePen, FilePlus, FileSearch, FileX, FolderTree, ImagePlus, TriangleAlert, X } from "lucide-react";
 import { PixelLoader } from "@/components/brand/pixel-loader";
 import { Spark } from "@/components/brand/spark";
 import type { CheckpointPart, ErrorPart, NoticePart, ReasoningPart, TextPart, ToolPart } from "@/lib/workspace/types";
@@ -58,6 +58,7 @@ const TOOL = {
   write_file: { icon: FilePlus, label: "Write" },
   replace_text: { icon: FilePen, label: "Edit" },
   delete_file: { icon: FileX, label: "Delete" },
+  generate_image: { icon: ImagePlus, label: "Draw" },
 } as const;
 
 function summarize(all: ToolPart[]) {

@@ -15,7 +15,7 @@ import { lstat, mkdir, open, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 
 const ROOT = process.env.GS_WORKSPACE ?? "/workspace";
-const MAX_FILE = Number(process.env.GS_MAX_FILE_BYTES ?? 2 * 1024 * 1024);
+const MAX_FILE = Number(process.env.GS_MAX_FILE_BYTES ?? 4 * 1024 * 1024);
 const MAX_FILES = 5000;
 // Not part of the game's source: dependencies, caches and build output.
 const SKIP = new Set(["node_modules", ".vite", "dist", ".git"]);

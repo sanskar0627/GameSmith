@@ -21,6 +21,7 @@ const VERB = {
   write_file: "wrote",
   replace_text: "edited",
   delete_file: "deleted",
+  generate_image: "painted",
 } as const;
 
 function userText(message: ChatMessage): string {

@@ -53,7 +53,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     maxSandboxes: int(env, "SANDBOX_MAX_RUNNING", 20),
     proxyContainer: env.PROXY_CONTAINER || "gamesmith-sandbox-proxy",
     snapshotsDir: env.SNAPSHOTS_DIR || "/data/snapshots",
-    maxFileBytes: int(env, "SANDBOX_MAX_FILE_BYTES", 2 * 1024 * 1024),
+    maxFileBytes: int(env, "SANDBOX_MAX_FILE_BYTES", 4 * 1024 * 1024),
     appOrigin: env.APP_ORIGIN || "http://localhost:3000",
   };
 }

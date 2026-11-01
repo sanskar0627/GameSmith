@@ -30,6 +30,7 @@ const VERB: Record<ToolPart["tool"], string> = {
   write_file: "Writing",
   replace_text: "Editing",
   delete_file: "Deleting",
+  generate_image: "Painting",
 };
 
 type Options = { autoPrompt?: string; resumeBuild?: boolean };

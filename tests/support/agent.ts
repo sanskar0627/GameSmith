@@ -76,8 +76,10 @@ export const finish = (reason: "stop" | "tool-calls", input = 1000, output = 200
 /** A model that plays back one scripted step per call. */
 export function scriptedModel(steps: Chunk[][], options: { delayMs?: number } = {}) {
   let call = 0;
+  const tools: string[][] = [];
   const model = new MockLanguageModelV4({
-    doStream: async () => {
+    doStream: async (request) => {
+      tools.push((request.tools ?? []).map((t) => t.name));
       const chunks = steps[Math.min(call, steps.length - 1)]!;
       call++;
       return {
@@ -85,5 +87,5 @@ export function scriptedModel(steps: Chunk[][], options: { delayMs?: number } = 
       };
     },
   });
-  return { model, calls: () => call };
+  return { model, calls: () => call, tools: () => tools };
 }

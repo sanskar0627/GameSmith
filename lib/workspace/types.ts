@@ -6,7 +6,7 @@
  * components/workspace/use-mock-agent.ts produces the same shapes.
  */
 
-export type FileTool = "list_files" | "read_file" | "write_file" | "replace_text" | "delete_file";
+export type FileTool = "list_files" | "read_file" | "write_file" | "replace_text" | "delete_file" | "generate_image";
 
 export type TextPart = { type: "text"; text: string; streaming?: boolean };
 

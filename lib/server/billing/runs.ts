@@ -89,14 +89,14 @@ export async function startRun(
 }
 
 /** Sparks the run may still spend given its usage so far. Infinity for BYOK. */
-export function runAllowance(run: AgentRun, spec: ModelSpec, usageSoFar: TokenUsage): number {
+export function runAllowance(run: AgentRun, spec: ModelSpec, usageSoFar: TokenUsage, extraCostMicroUsd = 0): number {
   if (run.billingMode === "byok") return Number.POSITIVE_INFINITY;
   const held = run.reservedGranted + run.reservedPurchased;
-  return Math.max(0, held - sparksForCost(costMicroUsd(spec, usageSoFar)));
+  return Math.max(0, held - sparksForCost(costMicroUsd(spec, usageSoFar) + extraCostMicroUsd));
 }
 
 /**
- * Ends a run: records usage, charges sparks (never more than the hold) and
+ * Ends a run: records usage (tokens plus platform-paid art), charges sparks (never more than the hold) and
  * releases the rest. Safe to call twice: the second call changes nothing.
  */
 export async function finishRun(
@@ -104,6 +104,8 @@ export async function finishRun(
     runId: string;
     spec: ModelSpec;
     usage: TokenUsage;
+    /** Platform-paid costs beyond tokens (game art), in micro-USD. */
+    extraCostMicroUsd?: number;
     outcome: "settled" | "failed" | "canceled";
     error?: string;
     now?: Date;
@@ -115,7 +117,7 @@ export async function finishRun(
     if (!current) throw new Error("Run not found");
     if (current.status !== "running") return current;
 
-    const cost = costMicroUsd(input.spec, input.usage);
+    const cost = costMicroUsd(input.spec, input.usage) + Math.max(0, Math.floor(input.extraCostMicroUsd ?? 0));
     const fields = {
       status: input.outcome,
       inputTokens: Math.max(0, Math.floor(input.usage.inputTokens)),

@@ -75,3 +75,23 @@ export async function resolveRunCredentials(
   if (spec.credits && platform) return { mode: "credits", spec, apiKey: platform };
   return { mode: "locked", spec, reason: spec.credits ? "platform-unavailable" : "needs-key" };
 }
+
+/**
+ * Who pays for game art in a run. The user's own Fal key always wins (0
+ * sparks). Otherwise the platform Fal key, but only for a sparks run: a run
+ * on the user's own chat key holds no sparks to pay for images with.
+ * Null: the run has no art tool.
+ */
+export type AssetCredentials = { mode: "byok" | "credits"; apiKey: string };
+
+export async function resolveAssetCredentials(
+  userId: string,
+  runBillingMode: "byok" | "credits",
+  database: Executor = db(),
+): Promise<AssetCredentials | null> {
+  const own = await readProviderKey(userId, "fal", database);
+  if (own) return { mode: "byok", apiKey: own };
+  const platform = platformKey("fal");
+  if (platform && runBillingMode === "credits") return { mode: "credits", apiKey: platform };
+  return null;
+}
