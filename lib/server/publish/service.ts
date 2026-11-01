@@ -241,16 +241,15 @@ export function playableBuild(game: Pick<Game, "publishedBuildId" | "visibility"
 }
 
 /**
- * Housekeeping: builds no live game points at (a deleted game's, or one
- * left behind by a failed publish). Their files go with them (cascade).
+ * Housekeeping: builds no game points at (left behind by an interrupted
+ * publish). A soft-deleted game keeps its build, so "restore" brings its
+ * play page back; purging the game removes the build (cascade).
  */
 export async function pruneOrphanBuilds(database: Database = db()): Promise<number> {
   const rows = await database.execute<{ id: string }>(sql`
     delete from published_builds b
     where b.created_at < now() - interval '1 hour'
-      and not exists (
-        select 1 from games g where g.published_build_id = b.id and g.deleted_at is null
-      )
+      and not exists (select 1 from games g where g.published_build_id = b.id)
     returning b.id`);
   return rows.length;
 }

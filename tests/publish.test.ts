@@ -148,12 +148,19 @@ describe("publishing", () => {
     expect((await getPublishState("user_a", game.id)).published).toBeNull();
   });
 
-  it("stops serving a deleted game and prunes its builds", async () => {
+  it("stops serving a deleted game but keeps its build for restore", async () => {
     const game = await setup({ visibility: "link" });
     const { published } = await publishGame("user_a", game.id);
     await db().update(games).set({ deletedAt: new Date() }).where(eq(games.id, game.id));
     expect((await fetchBuild(published!.url)).status).toBe(404);
+
     await db().update(publishedBuilds).set({ createdAt: new Date(Date.now() - 2 * 3600_000) });
+    expect(await pruneOrphanBuilds()).toBe(0);
+    await db().update(games).set({ deletedAt: null }).where(eq(games.id, game.id));
+    expect((await fetchBuild(published!.url)).status).toBe(200);
+
+    // A build nothing points at (an interrupted publish) is pruned.
+    await db().update(games).set({ publishedBuildId: null }).where(eq(games.id, game.id));
     expect(await pruneOrphanBuilds()).toBe(1);
   });
 
