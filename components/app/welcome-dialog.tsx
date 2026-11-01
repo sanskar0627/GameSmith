@@ -6,6 +6,7 @@ import { Spark } from "@/components/brand/spark";
 import { DitherField } from "@/components/dither/dither-field";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { markWelcomedAction } from "@/lib/server/account-actions";
 
 const KEY = "gs-welcomed";
 
@@ -16,13 +17,14 @@ const STEPS = [
 ];
 
 /**
- * First-run welcome. Shown once per browser.
- * TODO(data): store "welcomed" on the user (Clerk metadata) so it is once per account.
+ * First-run welcome. Shown once per account (users.welcomed_at), with a
+ * local flag so it never flashes again in this browser while that saves.
  */
-export function WelcomeDialog() {
+export function WelcomeDialog({ welcomed = false }: { welcomed?: boolean }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (welcomed) return;
     // From a timer, not the effect body: a short beat after the shell paints.
     const t = setTimeout(() => {
       try {
@@ -32,7 +34,7 @@ export function WelcomeDialog() {
       }
     }, 600);
     return () => clearTimeout(t);
-  }, []);
+  }, [welcomed]);
 
   const close = () => {
     try {
@@ -41,6 +43,7 @@ export function WelcomeDialog() {
       /* ignore */
     }
     setOpen(false);
+    void markWelcomedAction().catch(() => {});
   };
 
   return (

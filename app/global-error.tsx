@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportClientError } from "@/lib/client/report";
 import "./globals.css";
 
 /**
@@ -9,8 +10,8 @@ import "./globals.css";
  */
 export default function GlobalError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
-    // TODO(observability): report to Sentry.
     console.error(error);
+    reportClientError(error, "global");
   }, [error]);
 
   return (

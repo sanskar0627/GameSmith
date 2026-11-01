@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: gamesmith
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_DB: gamesmith_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gamesmith -d gamesmith_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://gamesmith:ci-password@localhost:5432/gamesmith_test
+      DATABASE_URL: postgres://gamesmith:ci-password@localhost:5432/gamesmith_test
+      TEST_REDIS_URL: redis://localhost:6379
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Migrations apply cleanly
+        run: node --import tsx scripts/migrate.mts
+      - run: npm test
+      - name: Worker boots (catches imports that break outside Next)
+        run: |
+          AGENT_QUEUE=redis REDIS_URL=redis://localhost:6379 timeout 20 npm run worker > worker.log 2>&1 || true
+          cat worker.log
+          grep -q "waiting for runs" worker.log
+      - name: Production build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_APP_URL: https://gamesmith.example
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+
+  sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            sandbox/manager/package-lock.json
+            sandbox/template/files/package-lock.json
+      - run: npm run sandbox:install
+      - run: npm --prefix sandbox/manager run typecheck
+      - run: npm run sandbox:test
+      - name: Sandbox images build
+        run: |
+          docker build -t gamesmith-sandbox:latest sandbox/template
+          docker build -t gamesmith-sandbox-manager:latest sandbox/manager

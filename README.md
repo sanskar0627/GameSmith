@@ -6,7 +6,7 @@ The product is built around a warm, tactile visual system: editorial typography,
 
 ## Status
 
-GameSmith is under active development. Authentication, the public landing experience, the protected workspace shell, game routes, billing foundations, and the visual design system are in place. Game generation and deeper workspace workflows are continuing to evolve.
+GameSmith is ready to deploy. Authentication, the workspace, the Smith agent (with painted game art), isolated sandboxes with live previews, the code editor, sparks billing, publishing to a separate content origin, account deletion, housekeeping and the production stack are in place. See [`docs/deploy.md`](docs/deploy.md) to run it on a VM.
 
 ## Stack
 
@@ -81,7 +81,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. Signing in 
 | `npm run db:migrate` | Apply pending migrations |
 | `npm run db:studio` | Browse the database in Drizzle Studio |
 | `npm run redis:up` | Start the local Redis container (agent queue and events) |
-| `npm run worker` | Run the agent worker (when `AGENT_QUEUE=redis`) |
+| `npm run worker` | Run the agent worker and housekeeping (when `AGENT_QUEUE=redis`) |
+| `npm run housekeeping` | One cleanup pass by hand (stale runs, deleted games, orphan builds) |
+| `npm run db:migrate:prod` | Apply migrations without drizzle-kit (production, CI) |
 | `npm run build` | Create a production build |
 | `npm run start` | Serve the production build locally |
 
@@ -94,7 +96,8 @@ app/
 	(app)/              Protected game workspace
 	play/               Playable game routes
 	design-system/      Development-only component and token preview
-	api/                Route handlers (health, webhooks)
+	api/                Route handlers (health, webhooks, games, errors)
+	b/                  Published game files (content origin only)
 components/
 	app/                Workspace UI and product features
 	auth/               Authentication branding components
@@ -102,7 +105,7 @@ components/
 	settings/           Account and billing settings UI
 	ui/                 Shared interface primitives
 docs/
-	architecture.md     Architecture decisions and the phased delivery plan
+	deploy.md           Production runbook (VM, compose, TLS, backups, incidents)
 drizzle/              SQL migrations (generated, committed)
 lib/
 	auth.ts             Server-side authentication boundaries
@@ -140,7 +143,7 @@ Each game runs in its own isolated container with a live preview. The app reache
 
 ### The agent
 
-Smith, the agent, builds the game in its sandbox: it can ask one question, proposes a brief, writes files, and saves playable versions (checkpoints). Runs are started with `POST /api/games/:id/runs` (a prompt, an answer, approving the brief, or the saved first prompt) and stream to the workspace over server-sent events (`GET /api/games/:id/runs/:runId/events`, resumable with `Last-Event-ID`); `POST .../cancel` stops one. Only one run per game at a time. Sparks are held when a run starts and settled from real token usage when it ends; runs on the player's own key cost no sparks. When the game crashes in the preview, the template reports the error and the workspace offers "Ask Smith to fix it".
+Smith, the agent, builds the game in its sandbox: it can ask one question, proposes a brief, writes files, paints a few images (textures, sprites, backdrops) into `public/assets/`, and saves playable versions (checkpoints). Painting uses the player's own Fal key for free, or `PLATFORM_FAL_KEY` on a sparks run (charged per image, see `lib/billing/pricing.ts`); without either, Smith draws everything with code. Runs are started with `POST /api/games/:id/runs` (a prompt, an answer, approving the brief, or the saved first prompt) and stream to the workspace over server-sent events (`GET /api/games/:id/runs/:runId/events`, resumable with `Last-Event-ID`); `POST .../cancel` stops one. Only one run per game at a time. Sparks are held when a run starts and settled from real token usage when it ends; runs on the player's own key cost no sparks. When the game crashes in the preview, the template reports the error and the workspace offers "Ask Smith to fix it".
 
 How runs execute is set by `AGENT_QUEUE`:
 
@@ -148,6 +151,10 @@ How runs execute is set by `AGENT_QUEUE`:
 - `redis` (production default): the app queues runs in BullMQ and a separate worker executes them; events go through Redis Streams. Start Redis with `npm run redis:up` and the worker with `npm run worker` (`AGENT_CONCURRENCY` runs per process).
 
 The agent needs sandboxes (below) and a model it can use: a platform key (`PLATFORM_*`) for models paid with sparks, or your own key in Settings > API keys. The code lives in [`lib/server/agent`](lib/server/agent) (runner, tools, prompt, event bus, queue) and [`worker/main.mts`](worker/main.mts). Set `TEST_REDIS_URL` to also run the Redis integration test.
+
+### Publishing
+
+Share, then Publish, builds what's live in the preview (`vite build`, run inside the sandbox) and makes it the game's build on `/play/:id`. The files are stored per build in Postgres and served only from `PUBLISHED_ORIGIN`, a different site from the app, because game code is untrusted: it never sees the app's cookies or APIs. The play page embeds `<PUBLISHED_ORIGIN>/b/<build>/p/index.html` while the game is shared by link; the owner gets a signed link that also works for private games. Publishing again or unpublishing retires old URLs. Owner-only API: `GET/POST/DELETE /api/games/:id/publish`. Locally, nothing to set: with the app on `localhost:3000`, builds are served from `127.0.0.1:3000`.
 
 ### Live editor
 
@@ -184,7 +191,9 @@ npm run build
 npm run start
 ```
 
-Production runs on a self-managed VM with Docker Compose (Postgres, Redis, the app, the agent worker and isolated sandboxes). See [`docs/architecture.md`](docs/architecture.md) for the plan; the deployment runbook arrives in Phase 12.
+Production runs on one VM with Docker Compose: Postgres, Redis, the app, the agent worker, the sandbox manager and preview proxy, and Caddy for TLS (`compose.prod.yml`, `Dockerfile`, `docker/caddy/Caddyfile`). The full runbook, including gVisor, DNS for the three origins, backups and incident steps, is in [`docs/deploy.md`](docs/deploy.md). CI (`.github/workflows/ci.yml`) runs lint, typecheck, migrations, tests, a worker boot check, the production build and the sandbox tests on every pull request.
+
+Errors are reported to Sentry when `SENTRY_DSN` is set (server errors through `instrumentation.ts`, browser crashes through `/api/errors`), and always logged.
 
 ## License
 

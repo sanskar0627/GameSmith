@@ -15,7 +15,8 @@ const { Worker } = await import("bullmq");
 const { serverEnv } = await import("@/lib/env");
 const { QUEUE_NAME, closeAgentConnections, redisOptions, runBus } = await import("@/lib/server/agent/queue");
 const { executeRun } = await import("@/lib/server/agent/runner");
-const { sweepStaleRuns } = await import("@/lib/server/agent/service");
+const { runHousekeeping } = await import("@/lib/server/housekeeping");
+const { reportError } = await import("@/lib/server/report");
 
 const env = serverEnv();
 if (env.AGENT_QUEUE !== "redis") {
@@ -42,14 +43,26 @@ const worker = new Worker<{ runId: string }>(
   },
 );
 
-worker.on("failed", (job, error) => console.error(`[worker] run ${job?.data.runId} crashed`, error));
+worker.on("failed", (job, error) => {
+  console.error(`[worker] run ${job?.data.runId} crashed`, error);
+  void reportError(error, { where: "worker", runId: job?.data.runId });
+});
 worker.on("ready", () => console.log(`[worker] waiting for runs (concurrency ${env.AGENT_CONCURRENCY})`));
 
-const sweep = () =>
-  sweepStaleRuns().then(
-    (n) => n && console.log(`[worker] failed ${n} stale run(s)`),
-    (error) => console.error("[worker] sweep failed", error),
-  );
+// Stale runs, deleted games and accounts, orphan builds (lib/server/housekeeping.ts).
+let sweeping = false;
+const sweep = async () => {
+  if (sweeping) return;
+  sweeping = true;
+  try {
+    const report = await runHousekeeping();
+    if (Object.values(report).some((n) => n > 0)) console.log("[worker] housekeeping", JSON.stringify(report));
+  } catch (error) {
+    console.error("[worker] housekeeping failed", error);
+  } finally {
+    sweeping = false;
+  }
+};
 await sweep();
 const sweeper = setInterval(sweep, 60_000);
 

@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+.next
+coverage
+.env*
+!.env.example
+sandbox
+tests
+docs
+*.md
+!README.md
+.clerk

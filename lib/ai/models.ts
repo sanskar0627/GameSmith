@@ -53,7 +53,7 @@ export type ModelSpec = {
 };
 
 export const MODELS: readonly ModelSpec[] = [
-  // Anthropic. Source: platform.claude.com/docs/en/models/overview and /about-claude/pricing (checked 2026-10-10).
+  // Anthropic. Source: platform.claude.com/docs/en/models/overview and /about-claude/pricing (checked 2026-10-10, re-checked 2026-11-01).
   {
     id: "anthropic/claude-sonnet-5-5",
     provider: "anthropic",

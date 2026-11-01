@@ -8,7 +8,7 @@
     "start": "next start",
     "worker": "node --conditions=react-server --import tsx worker/main.mts",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:up": "docker compose --env-file .env.local up -d --wait postgres",
@@ -22,7 +22,9 @@
     "sandbox:build": "docker compose --env-file .env.local --profile build --profile sandbox build sandbox-image sandbox-manager",
     "sandbox:up": "docker compose --env-file .env.local --profile sandbox up -d --wait sandbox-manager sandbox-proxy",
     "sandbox:down": "docker compose --env-file .env.local --profile sandbox stop sandbox-manager sandbox-proxy",
-    "sandbox:smoke": "node --env-file=.env.local sandbox/smoke.mjs"
+    "sandbox:smoke": "node --env-file=.env.local sandbox/smoke.mjs",
+    "db:migrate:prod": "node --import tsx scripts/migrate.mts",
+    "housekeeping": "node --conditions=react-server --import tsx scripts/housekeeping.mts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.78",

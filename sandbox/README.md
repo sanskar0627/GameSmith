@@ -97,15 +97,28 @@ manager (it snapshots them first).
    `npm run sandbox:smoke` with `SANDBOX_RUNTIME=runsc` to confirm the
    runtime and isolation on the VM.
 
-The production compose file, TLS for the preview domain and R2 copies of
-snapshots arrive in Phase 12.
+The production stack (`compose.prod.yml`: TLS for the preview domain through
+Caddy, `PREVIEW_PUBLIC_PORT=443`, runsc required) and nightly snapshot backups
+(`scripts/backup.sh`, optionally copied to R2 with rclone) are described in
+[`docs/deploy.md`](../docs/deploy.md).
 
-## Known limits
+## Publishing builds
 
-- No per-sandbox disk quota yet: a runaway game can fill the workspace
-  volume. Phase 12 adds XFS project quotas (or size-limited volumes) and
-  disk alerts.
-- Snapshots live on the VM's disk until Phase 12 copies them to R2.
+`POST /v1/sandboxes/:gameId/build` runs `build.mjs` inside the sandbox:
+`vite build --base ./` into a temporary folder in the workspace, then the
+files come back as JSON (base64). The output uses relative URLs, so the app
+can serve it from any path on the content origin. Builds are capped at 40 MB
+and 2,000 files; a failed build returns 422 with the end of Vite's log.
+
+`DELETE /v1/sandboxes/:gameId` removes the container, its network, the
+workspace volume and every snapshot (account deletion and housekeeping).
+
+## Limits
+
+- Each file is at most 4 MB (`SANDBOX_MAX_FILE_BYTES`); a workspace's source
+  is at most 100 MB and 5,000 files, checked inside the sandbox on every
+  write (`fsop.mjs`), the same cap snapshots enforce.
+- Snapshots live on the VM's disk (the `snapshots` volume), backed up nightly.
 - Previews share one origin (`/p/...` paths). They are owner-only, but two of
   the same owner's previews could read each other's pages if both links were
-  known. Published games (Phase 11) get their own domain.
+  known. Published games are served from their own origin (`PUBLISHED_ORIGIN`).

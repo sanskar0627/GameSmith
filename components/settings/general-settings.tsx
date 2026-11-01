@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { Check, ExternalLink } from "lucide-react";
 import {
   AlertDialog,
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { type ThemeChoice, useTheme } from "@/components/theme/theme";
+import { deleteAccountAction } from "@/lib/server/account-actions";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./settings-nav";
 
@@ -156,15 +158,28 @@ function DangerZone() {
 
 function DeleteAccountForm({ onDone }: { onDone: () => void }) {
   const [typed, setTyped] = useState("");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const { signOut } = useClerk();
+  const router = useRouter();
   const match = typed.trim().toLowerCase() === CONFIRM;
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (!match) return;
-        // TODO(data): server action that tears down sandboxes and data, then deletes the Clerk user.
-        toast.add({ title: "Not connected yet", description: "Account deletion arrives with the backend. Nothing was deleted." });
-        onDone();
+        if (!match || pending) return;
+        setError(null);
+        startTransition(async () => {
+          const result = await deleteAccountAction(typed);
+          if (!result.ok) {
+            setError(result.error);
+            return;
+          }
+          onDone();
+          toast.add({ title: "Account deleted", description: "Your games and data are gone. Thanks for forging with us." });
+          // The Clerk user is already gone; signing out clears this browser's session.
+          await signOut({ redirectUrl: "/" }).catch(() => router.replace("/"));
+        });
       }}
       className="flex flex-col gap-4"
     >
@@ -180,10 +195,15 @@ function DeleteAccountForm({ onDone }: { onDone: () => void }) {
         </span>
         <Input value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus className="h-10" aria-label={`Type ${CONFIRM} to confirm`} />
       </label>
+      {error && (
+        <p role="alert" className="text-[13px] text-destructive">
+          {error}
+        </p>
+      )}
       <AlertDialogFooter>
         <AlertDialogCancel>Cancel</AlertDialogCancel>
-        <Button type="submit" variant="destructive" disabled={!match}>
-          Delete account
+        <Button type="submit" variant="destructive" disabled={!match || pending}>
+          {pending ? "Deleting\u2026" : "Delete account"}
         </Button>
       </AlertDialogFooter>
     </form>

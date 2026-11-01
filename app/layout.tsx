@@ -39,7 +39,7 @@ const geistPixel = Geist_Pixel({
 const DESCRIPTION = "Describe a game in a sentence. GameSmith's agent designs it, builds it in real code, and hands you something to play.";
 
 export const metadata: Metadata = {
-  // TODO(deploy): set NEXT_PUBLIC_APP_URL so share images get absolute URLs.
+  // NEXT_PUBLIC_APP_URL is inlined at build time (docker build arg), so share images get absolute URLs.
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: { default: "GameSmith: describe a world, we'll forge it", template: "%s · GameSmith" },
   description: DESCRIPTION,

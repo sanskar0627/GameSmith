@@ -1,0 +1,175 @@
+# GameSmith production stack for one VM (Ubuntu/Debian with Docker and gVisor).
+# See docs/deploy.md for the full runbook.
+#
+#   docker compose -f compose.prod.yml --env-file .env.production build
+#   docker compose -f compose.prod.yml --env-file .env.production up -d
+#
+# Every secret comes from .env.production (never committed). Only Caddy
+# publishes ports (80/443); everything else is on private networks.
+name: gamesmith-prod
+
+x-app-env: &app-env
+  env_file: .env.production
+  environment:
+    NODE_ENV: production
+    DATABASE_URL: postgres://gamesmith:${POSTGRES_PASSWORD:?}@postgres:5432/gamesmith
+    REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
+    AGENT_QUEUE: redis
+    SANDBOX_MANAGER_URL: http://sandbox-manager:4100
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gamesmith
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: gamesmith
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamesmith -d gamesmith"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    shm_size: 256mb
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env.production}", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  # Applies pending migrations, then exits. The app and worker wait for it.
+  migrate:
+    image: gamesmith-app:latest
+    <<: *app-env
+    command: ["node", "--import", "tsx", "scripts/migrate.mts"]
+    networks: [internal]
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    image: gamesmith-app:latest
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env.production}
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY in .env.production}
+    <<: *app-env
+    restart: unless-stopped
+    networks: [internal]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # Runs agent jobs and housekeeping. Scale with --scale worker=N.
+  worker:
+    image: gamesmith-app:latest
+    <<: *app-env
+    command: ["node", "--conditions=react-server", "--import", "tsx", "worker/main.mts"]
+    restart: unless-stopped
+    stop_grace_period: 60s
+    networks: [internal]
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # The per-game sandbox image (build only; the manager runs one container per game).
+  sandbox-image:
+    image: gamesmith-sandbox:latest
+    build: ./sandbox/template
+    profiles: ["build"]
+
+  # The only service with the Docker socket. Never reachable from sandboxes.
+  sandbox-manager:
+    image: gamesmith-sandbox-manager:latest
+    build: ./sandbox/manager
+    container_name: gamesmith-sandbox-manager
+    restart: unless-stopped
+    environment:
+      SANDBOX_MANAGER_TOKEN: ${SANDBOX_MANAGER_TOKEN:?Set SANDBOX_MANAGER_TOKEN in .env.production}
+      SANDBOX_RUNTIME: runsc
+      SANDBOX_REQUIRE_GVISOR: "true"
+      SANDBOX_IMAGE: gamesmith-sandbox:latest
+      SANDBOX_MAX_RUNNING: ${SANDBOX_MAX_RUNNING:-20}
+      PROXY_CONTAINER: gamesmith-sandbox-proxy
+      # Browsers reach previews over HTTPS through Caddy (HMR included).
+      PREVIEW_PUBLIC_PORT: "443"
+      SNAPSHOTS_DIR: /data/snapshots
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - snapshots:/data/snapshots
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4100/healthz >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Serves previews; joins each sandbox's private network. No Docker access.
+  sandbox-proxy:
+    image: gamesmith-sandbox-manager:latest
+    container_name: gamesmith-sandbox-proxy
+    restart: unless-stopped
+    user: node
+    command: ["node", "dist/proxy-main.js"]
+    environment:
+      SANDBOX_MANAGER_TOKEN: ${SANDBOX_MANAGER_TOKEN}
+      MANAGER_URL: http://sandbox-manager:4100
+      APP_ORIGIN: ${NEXT_PUBLIC_APP_URL}
+      PREVIEW_PORT: "4101"
+    networks: [internal]
+    depends_on:
+      sandbox-manager:
+        condition: service_healthy
+
+  # TLS (Let's Encrypt) for the app, the content origin and previews.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.production}
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.production}
+      PLAY_DOMAIN: ${PLAY_DOMAIN:?Set PLAY_DOMAIN in .env.production}
+      PREVIEW_DOMAIN: ${PREVIEW_DOMAIN:?Set PREVIEW_DOMAIN in .env.production}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    networks: [internal]
+    depends_on: [app, sandbox-proxy]
+
+networks:
+  internal:
+
+volumes:
+  pgdata:
+  redisdata:
+  snapshots:
+  caddydata:
+  caddyconfig:
