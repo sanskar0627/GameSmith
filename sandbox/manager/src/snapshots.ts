@@ -139,6 +139,12 @@ export class SnapshotStore {
     return createReadStream(this.file(gameId, name));
   }
 
+  /** Deletes every snapshot of a game (account or game deletion). */
+  async removeAll(gameId: string) {
+    if (!/^[0-9a-f-]{36}$/.test(gameId)) throw new SnapshotError("Invalid game id");
+    await rm(path.join(this.dir, gameId), { recursive: true, force: true });
+  }
+
   async copy(fromGameId: string, toGameId: string, name = "latest") {
     const target = this.file(toGameId, name);
     await mkdir(path.dirname(target), { recursive: true });

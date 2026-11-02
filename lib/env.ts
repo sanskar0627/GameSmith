@@ -67,6 +67,12 @@ const schema = z.object({
     .optional()
     .refine((v) => !v || /^rediss?:\/\//.test(v), "REDIS_URL must be a redis:// URL"),
   AGENT_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
+  // Published games (Phase 11) are served from this origin, never the app's:
+  // game code is untrusted. Use a separate registrable domain in production
+  // (e.g. https://play.gamesmith.games next to https://gamesmith.app).
+  PUBLISHED_ORIGIN: z.url().optional(),
+  // Error reports (optional): a Sentry DSN. Without it errors are only logged.
+  SENTRY_DSN: z.url().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
@@ -105,6 +111,16 @@ export function serverEnv(): ServerEnv {
   }
   if (!input.REDIS_URL) delete input.REDIS_URL;
 
+  // Locally the content origin is the same server under another host name
+  // (localhost vs 127.0.0.1), which browsers treat as a different origin.
+  if (!input.PUBLISHED_ORIGIN && input.NODE_ENV !== "production") {
+    const app = new URL(input.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
+    if (app.hostname === "localhost") input.PUBLISHED_ORIGIN = `${app.protocol}//127.0.0.1${app.port ? `:${app.port}` : ""}`;
+  }
+  for (const key of ["PUBLISHED_ORIGIN", "SENTRY_DSN", "SANDBOX_MANAGER_URL", "SANDBOX_PREVIEW_ORIGIN"]) {
+    if (!input[key]) delete input[key];
+  }
+
   const parsed = schema.safeParse(input);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
@@ -112,6 +128,9 @@ export function serverEnv(): ServerEnv {
   }
   if (parsed.data.NODE_ENV === "production" && parsed.data.AGENT_QUEUE === "inline") {
     throw new Error("Invalid server environment:\n  - AGENT_QUEUE: inline runs are for development; use redis in production");
+  }
+  if (parsed.data.PUBLISHED_ORIGIN && new URL(parsed.data.PUBLISHED_ORIGIN).host === new URL(parsed.data.NEXT_PUBLIC_APP_URL).host) {
+    throw new Error("Invalid server environment:\n  - PUBLISHED_ORIGIN: must be a different host from NEXT_PUBLIC_APP_URL (games are untrusted code)");
   }
   if (parsed.data.AGENT_QUEUE === "redis" && !parsed.data.REDIS_URL) {
     throw new Error("Invalid server environment:\n  - REDIS_URL: required when AGENT_QUEUE=redis");

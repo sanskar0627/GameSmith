@@ -7,10 +7,10 @@ import { and, desc, eq, max } from "drizzle-orm";
 
 import type { ModelSpec } from "@/lib/ai/models";
 import { chatModel } from "@/lib/ai/providers";
-import { costMicroUsd, sparksForCost, type TokenUsage } from "@/lib/billing/pricing";
+import { costMicroUsd, imageCostMicroUsd, MAX_IMAGES_PER_RUN, sparksForCost, type TokenUsage } from "@/lib/billing/pricing";
 import { db, type Database } from "@/lib/db";
 import { agentRuns, gameVersions, games, messages, type AgentRun } from "@/lib/db/schema";
-import { resolveRunCredentials } from "@/lib/server/ai/access";
+import { resolveAssetCredentials, resolveRunCredentials } from "@/lib/server/ai/access";
 import { finishRun, runAllowance } from "@/lib/server/billing/runs";
 import { listMessages, toChatMessage } from "@/lib/server/games/queries";
 import type { SandboxClient } from "@/lib/server/sandbox/client";
@@ -19,9 +19,10 @@ import type { RunEvent } from "@/lib/workspace/events";
 import type { AgentActivity, BuildState, BuildStep, FileTool, MessagePart } from "@/lib/workspace/types";
 
 import type { RunBus } from "./bus";
+import { falDraw, type Draw } from "./art";
 import { ASK_TOOL, BRIEF_TOOL, toModelMessages } from "./history";
 import { agentInstructions } from "./prompt";
-import { agentTools, FILE_TOOLS, type CheckpointResult } from "./tools";
+import { agentTools, FILE_TOOLS, type ArtDeps, type CheckpointResult } from "./tools";
 
 /**
  * Executes one agent run: model tool loop against the game's sandbox,
@@ -35,6 +36,8 @@ export type RunnerDeps = {
   /** Tests pass a mock model; production builds it from the catalog. */
   modelFor?: (spec: ModelSpec, apiKey: string) => LanguageModel;
   sandbox?: () => SandboxClient;
+  /** Tests pass a fake painter; production calls Fal with the run's key. */
+  drawFor?: (apiKey: string) => Draw;
   maxSteps?: number;
   /** Wall-clock cap for one run. */
   timeoutMs?: number;
@@ -52,6 +55,7 @@ const VERB: Record<FileTool, string> = {
   write_file: "Writing",
   replace_text: "Editing",
   delete_file: "Deleting",
+  generate_image: "Painting",
 };
 
 type Outcome = "settled" | "failed" | "canceled";
@@ -208,12 +212,41 @@ export async function executeRun(runId: string, deps: RunnerDeps): Promise<void>
 
   const usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
   let outOfSparks = false;
+
+  /* --- Game art ---------------------------------------------------------- */
+
+  // Platform-paid art adds to the run's cost; art on the user's Fal key is free.
+  let artCostMicro = 0;
+  let images = 0;
+  let art: ArtDeps | undefined;
+  const artCreds = await resolveAssetCredentials(run.userId, run.billingMode, database).catch((error) => {
+    console.error("[agent] art credentials failed", run.id, (error as Error)?.message ?? error);
+    return null;
+  });
+  if (artCreds) {
+    const paid = artCreds.mode === "credits";
+    art = {
+      draw: (deps.drawFor ?? falDraw)(artCreds.apiKey),
+      abortSignal: abort.signal,
+      allow: (transparent) => {
+        if (images >= MAX_IMAGES_PER_RUN) throw new Error(`This run already made ${MAX_IMAGES_PER_RUN} images. Reuse the ones you have.`);
+        if (paid) {
+          const left = runAllowance(run, spec, usage, artCostMicro);
+          if (left < sparksForCost(imageCostMicroUsd(transparent)) + 1) throw new Error("Not enough sparks left in this run for another image. Draw it with code instead.");
+        }
+      },
+      drawn: (transparent) => {
+        images++;
+        if (paid) artCostMicro += imageCostMicroUsd(transparent);
+      },
+    };
+  }
   const budget: StopCondition<ReturnType<typeof agentTools>> = ({ steps: done }) => {
     const sofar: TokenUsage = { inputTokens: 0, outputTokens: 0 };
     for (const s of done) addUsage(sofar, s.usage);
     const last = done.at(-1);
     const lastCost = last ? sparksForCost(costMicroUsd(spec, { inputTokens: last.usage?.inputTokens ?? 0, outputTokens: last.usage?.outputTokens ?? 0 })) : 0;
-    const left = runAllowance(run, spec, sofar);
+    const left = runAllowance(run, spec, sofar, artCostMicro);
     outOfSparks = left <= Math.max(1, lastCost);
     return outOfSparks;
   };
@@ -228,9 +261,9 @@ export async function executeRun(runId: string, deps: RunnerDeps): Promise<void>
     const thread = (await listMessages(game.id, database)).map(toChatMessage);
     const result = streamText({
       model: (deps.modelFor ?? chatModel)(spec, apiKey),
-      instructions: agentInstructions({ title: game.title, pitch: game.pitch }),
+      instructions: agentInstructions({ title: game.title, pitch: game.pitch }, { art: Boolean(art) }),
       messages: toModelMessages(thread),
-      tools: agentTools({ gameId: game.id, sandbox, checkpoint }),
+      tools: agentTools({ gameId: game.id, sandbox, checkpoint, art }),
       stopWhen: [isStepCount(deps.maxSteps ?? MAX_STEPS), hasToolCall(ASK_TOOL, BRIEF_TOOL), budget],
       abortSignal: abort.signal,
       maxRetries: 2,
@@ -279,7 +312,8 @@ export async function executeRun(runId: string, deps: RunnerDeps): Promise<void>
           const input = (part.input ?? {}) as Record<string, unknown>;
           if (FILE_TOOLS.has(part.toolName)) {
             const tool = part.toolName as FileTool;
-            const file = typeof input.path === "string" ? input.path : "";
+            const file =
+              typeof input.path === "string" ? input.path : tool === "generate_image" && typeof input.name === "string" ? `public/assets/${input.name}` : "";
             toolIndex.set(part.toolCallId, pushPart({ type: "tool", id: part.toolCallId, tool, state: "running", path: file }));
             activity({ state: "working", detail: file ? `${VERB[tool]} ${file}` : VERB[tool] });
             if (tool !== "read_file" && tool !== "list_files" && (build as BuildState).status !== "building") {
@@ -307,11 +341,13 @@ export async function executeRun(runId: string, deps: RunnerDeps): Promise<void>
         case "tool-result": {
           const index = toolIndex.get(part.toolCallId);
           const output = (part.output ?? {}) as { added?: number; removed?: number; path?: string };
+          const finalPath = typeof output.path === "string" ? output.path : undefined;
           if (index !== undefined) {
             const current = parts[index];
             if (current?.type === "tool") {
-              if (current.tool !== "read_file" && current.tool !== "list_files" && current.path) changed.add(current.path);
-              setPart(index, { ...current, state: "done", added: output.added, removed: output.removed });
+              const path = finalPath ?? current.path;
+              if (current.tool !== "read_file" && current.tool !== "list_files" && path) changed.add(path);
+              setPart(index, { ...current, path, state: "done", added: output.added, removed: output.removed });
             }
           } else if (part.toolName === "checkpoint") {
             const result = part.output as CheckpointResult;
@@ -393,7 +429,7 @@ export async function executeRun(runId: string, deps: RunnerDeps): Promise<void>
       .set({ status: (await currentVersion(database, game.id)) > 0 ? "ready" : "draft" })
       .where(eq(games.id, game.id));
   } finally {
-    await finishRun({ runId, spec, usage, outcome, error: errorMessage ?? undefined }, database);
+    await finishRun({ runId, spec, usage, extraCostMicroUsd: artCostMicro, outcome, error: errorMessage ?? undefined }, database);
   }
 
   const finalVersion = await currentVersion(database, game.id);

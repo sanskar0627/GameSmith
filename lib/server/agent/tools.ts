@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import type { SandboxClient } from "@/lib/server/sandbox/client";
 
+import { ART_SHAPES, imageExtension, type ArtShape, type Draw } from "./art";
 import { ASK_TOOL, BRIEF_TOOL } from "./history";
 
 /**
@@ -22,12 +23,30 @@ const path = z.string().min(1).max(256).describe("Path relative to the project r
 
 export type CheckpointResult = { version: number; label: string };
 
+/**
+ * Game art for this run. `allow` throws when the run can't make another
+ * image (cap or sparks); `drawn` records one that was made.
+ */
+export type ArtDeps = {
+  draw: Draw;
+  allow: (transparent: boolean) => void;
+  drawn: (transparent: boolean) => void;
+  abortSignal?: AbortSignal;
+};
+
 export type ToolDeps = {
   gameId: string;
   sandbox: SandboxClient;
   /** Saves a version (snapshot + game_versions row). */
   checkpoint: (label: string) => Promise<CheckpointResult>;
+  /** Absent when the run has no way to pay for images: no art tool. */
+  art?: ArtDeps;
 };
+
+const assetName = z
+  .string()
+  .regex(/^[a-z0-9][a-z0-9-]{0,47}$/, "lowercase letters, digits and dashes, like hero-ship")
+  .describe("File name without extension, like hero-ship");
 
 export type FileChange = { added: number; removed: number };
 
@@ -56,6 +75,32 @@ async function readText(sandbox: SandboxClient, gameId: string, file: string): P
     if ((error as { status?: number }).status === 404) return null;
     throw error;
   }
+}
+
+function artTool(gameId: string, sandbox: SandboxClient, art: ArtDeps) {
+  return tool({
+    description:
+      "Paint one image for the game (textures, sprites, backgrounds, title art) and save it to public/assets/. " +
+      "Use it for a few key pieces, not every object. Load it in code with import.meta.env.BASE_URL + the returned url.",
+    inputSchema: z.object({
+      name: assetName,
+      prompt: z.string().min(3).max(600).describe("What to paint: subject, style, palette, lighting. No text in the image."),
+      shape: z.enum(Object.keys(ART_SHAPES) as [ArtShape, ...ArtShape[]]).default("square"),
+      transparent: z
+        .boolean()
+        .default(false)
+        .describe("true for sprites and icons: the subject is cut out onto a transparent PNG"),
+    }),
+    execute: async ({ name, prompt, shape, transparent }) => {
+      art.allow(transparent);
+      const image = await art.draw({ prompt, shape, transparent, abortSignal: art.abortSignal });
+      art.drawn(transparent);
+      const file = `public/assets/${name}.${imageExtension(image.mediaType)}`;
+      await sandbox.writeFile(gameId, file, image.data);
+      const [width, height] = ART_SHAPES[shape].split("x").map(Number);
+      return { path: file, url: `assets/${name}.${imageExtension(image.mediaType)}`, width, height, transparent };
+    },
+  });
 }
 
 export function agentTools(deps: ToolDeps) {
@@ -149,9 +194,10 @@ export function agentTools(deps: ToolDeps) {
       inputSchema: z.object({ label: z.string().min(1).max(60) }),
       execute: async ({ label }) => deps.checkpoint(label),
     }),
+    ...(deps.art ? { generate_image: artTool(gameId, sandbox, deps.art) } : {}),
   } satisfies ToolSet;
 }
 
 export type AgentTools = ReturnType<typeof agentTools>;
 
-export const FILE_TOOLS = new Set(["list_files", "read_file", "write_file", "replace_text", "delete_file"]);
+export const FILE_TOOLS = new Set(["list_files", "read_file", "write_file", "replace_text", "delete_file", "generate_image"]);

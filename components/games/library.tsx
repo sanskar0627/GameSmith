@@ -294,6 +294,7 @@ export function Library({ games: saved }: { games: GameCardData[] }) {
             games.find((g) => g.id === dialog.game.id)?.visibility ?? "private"
           }
           onVisibilityChange={(v) => changeVisibility(dialog.game, v)}
+          version={dialog.game.version}
         />
       )}
     </div>

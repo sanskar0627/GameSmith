@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy, Globe, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, Copy, ExternalLink, Globe, Lock, Rocket } from "lucide-react";
+import { PixelLoader } from "@/components/brand/pixel-loader";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -175,11 +176,17 @@ export function ShareDialog({
   title,
   visibility,
   onVisibilityChange,
+  version,
+  demo,
 }: Base & {
   gameId: string;
   title: string;
   visibility: GameVisibility;
   onVisibilityChange: (v: GameVisibility) => void;
+  /** Latest playable version; enables the Publish section. */
+  version?: number;
+  /** Demo workspaces show the section without calling the server. */
+  demo?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const url =
@@ -276,7 +283,121 @@ export function ShareDialog({
             </Button>
           </div>
         )}
+        {version !== undefined && open && <PublishSection gameId={gameId} version={version} demo={demo} />}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* --- Publish ------------------------------------------------------------- */
+
+type PublishState = {
+  configured: boolean;
+  published: null | { buildId: string; version: number; publishedAt: string; url: string; files: number; bytes: number };
+};
+
+function formatBytes(n: number) {
+  return n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} kB`;
+}
+
+/**
+ * Publishing: builds what's live in the sandbox and serves it on /play.
+ * The share link above decides who besides the owner can open it.
+ */
+function PublishSection({ gameId, version, demo }: { gameId: string; version: number; demo?: boolean }) {
+  const [state, setState] = useState<PublishState | null>(demo ? { configured: false, published: null } : null);
+  const [busy, setBusy] = useState<"publish" | "unpublish" | null>(null);
+  const [error, setError] = useState<{ message: string; detail?: string } | null>(null);
+
+  useEffect(() => {
+    if (demo) return;
+    let alive = true;
+    fetch(`/api/games/${gameId}/publish`, { cache: "no-store" })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!alive) return;
+        if (res.ok) setState(body as PublishState);
+        else setState({ configured: false, published: null });
+      })
+      .catch(() => alive && setState({ configured: false, published: null }));
+    return () => {
+      alive = false;
+    };
+  }, [gameId, demo]);
+
+  const act = async (kind: "publish" | "unpublish") => {
+    setBusy(kind);
+    setError(null);
+    try {
+      const res = await fetch(`/api/games/${gameId}/publish`, { method: kind === "publish" ? "POST" : "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as PublishState & { error?: string; detail?: string };
+      if (!res.ok) setError({ message: body.error ?? "Publishing failed. Try again.", detail: body.detail });
+      else setState(body);
+    } catch {
+      setError({ message: "Couldn\u2019t reach the server. Try again." });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const published = state?.published;
+  const outdated = published && published.version < version;
+
+  return (
+    <section aria-label="Publish" className="flex flex-col gap-2.5 border-t border-hairline pt-4">
+      <div className="flex items-start gap-3">
+        <Rocket className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">
+            {published ? `v${published.version} is published` : "Not published yet"}
+          </p>
+          <p className="text-[13px] text-muted-foreground">
+            {state === null
+              ? "Checking\u2026"
+              : !state.configured && !published
+                ? "Publishing isn\u2019t available on this server yet."
+                : published
+                  ? `${published.files} files, ${formatBytes(published.bytes)}. ${outdated ? `v${version} is newer.` : "Up to date."}`
+                  : version === 0
+                    ? "Save a playable version first."
+                    : "Build what\u2019s in your preview and put it on the play page."}
+          </p>
+        </div>
+      </div>
+      {error && (
+        <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px] text-destructive">
+          {error.message}
+          {error.detail && (
+            <pre className="mt-1.5 max-h-28 overflow-auto font-mono text-[11px] whitespace-pre-wrap opacity-80">{error.detail}</pre>
+          )}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant={published && !outdated ? "outline" : "ember"}
+          disabled={!state?.configured || version === 0 || busy !== null}
+          onClick={() => act("publish")}
+        >
+          {busy === "publish" ? <PixelLoader size="sm" label="Building" /> : <Rocket data-icon="inline-start" />}
+          {busy === "publish" ? "Building\u2026" : published ? `Publish v${version}` : "Publish"}
+        </Button>
+        {published && (
+          <>
+            <a
+              href={`/play/${gameId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted/50"
+            >
+              <ExternalLink className="size-3.5" /> Open play page
+            </a>
+            <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => act("unpublish")}>
+              {busy === "unpublish" ? "Unpublishing\u2026" : "Unpublish"}
+            </Button>
+          </>
+        )}
+      </div>
+    </section>
   );
 }

@@ -24,6 +24,10 @@ export type Session = { gameId: string; secret: string; base: string; startedAt:
 export type FileEntry = { path: string; size: number; mtime: number };
 
 const FSOP = ["node", "/opt/gs/fsop.mjs"];
+const BUILD = ["node", "/opt/gs/build.mjs"];
+const BUILD_TIMEOUT_MS = 180_000;
+
+export type BuiltFile = { path: string; data: string };
 
 export class SandboxManager {
   private readonly sessions = new Map<string, Session>();
@@ -197,6 +201,43 @@ export class SandboxManager {
     await this.fsop(gameId, ["delete", path]);
   }
 
+  /**
+   * Production build of the live workspace (for publishing): files with
+   * base64 data, relative URLs. One build per game at a time.
+   */
+  async build(gameId: string): Promise<{ files: BuiltFile[] }> {
+    return this.locked(`build:${gameId}`, async () => {
+      this.requireRunning(gameId);
+      this.touch(gameId);
+      const result = await this.driver.exec(gameId, BUILD, undefined, BUILD_TIMEOUT_MS);
+      this.touch(gameId);
+      if (result.exitCode === 4) throw new ManagerError(413, "The game is too large to publish.");
+      if (result.exitCode === 5) throw new ManagerError(422, `The game didn't build:\n${result.stderr.slice(-3000)}`);
+      if (result.exitCode !== 0) throw new ManagerError(500, "The build failed");
+      try {
+        const parsed = JSON.parse(result.stdout.toString("utf8")) as { files?: unknown };
+        if (!Array.isArray(parsed.files)) throw new Error();
+        const files = parsed.files.filter(
+          (f): f is BuiltFile => typeof f?.path === "string" && typeof f?.data === "string" && isBuildPath(f.path),
+        );
+        return { files };
+      } catch {
+        throw new ManagerError(500, "The build output was unreadable");
+      }
+    });
+  }
+
+  /** Forgets a game entirely: container, network, workspace and snapshots. */
+  async destroy(gameId: string) {
+    return this.locked(gameId, async () => {
+      await this.driver.stop(gameId);
+      this.sessions.delete(gameId);
+      await this.driver.removeWorkspace(gameId);
+      await this.snapshots.removeAll(gameId);
+      return { destroyed: true };
+    });
+  }
+
   /** Stops sandboxes idle for longer than the limit. Returns the ids stopped. */
   async reap(): Promise<string[]> {
     const cutoff = this.now() - this.config.idleMinutes * 60_000;
@@ -237,4 +278,10 @@ async function defaultWaitReady(driver: Driver, gameId: string, base: string, ti
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(last);
+}
+
+/** A safe relative path inside a build (no absolute paths, `..` or odd characters). */
+export function isBuildPath(p: string): boolean {
+  if (p.length === 0 || p.length > 300 || p.startsWith("/") || p.includes("\\") || p.includes("\0")) return false;
+  return p.split("/").every((part) => part !== "" && part !== "." && part !== ".." && /^[A-Za-z0-9._@~+-]+$/.test(part));
 }

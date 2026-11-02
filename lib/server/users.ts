@@ -1,13 +1,13 @@
 import "server-only";
 
 import { currentUser, type UserJSON } from "@clerk/nextjs/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { requireUser } from "@/lib/auth";
 import { db, type Executor } from "@/lib/db";
 import { explainDbError } from "@/lib/db/errors";
-import { providerKeys, users, type User } from "@/lib/db/schema";
+import { games, providerKeys, publishedBuilds, users, type User } from "@/lib/db/schema";
 
 /** The subset of a Clerk user that GameSmith stores. */
 export type UserProfile = {
@@ -64,8 +64,9 @@ export async function upsertUser(profile: UserProfile, database: Executor = db()
 }
 
 /**
- * Marks a user deleted, clears personal fields and destroys their saved
- * provider keys. Their games are kept for now (cleanup job, Phase 12).
+ * Marks a user deleted, clears personal fields, destroys their saved
+ * provider keys, and hides their games (off /play at once). Sandboxes and
+ * game rows are removed by housekeeping (lib/server/housekeeping.ts).
  */
 export async function softDeleteUser(id: string, database: Executor = db()): Promise<void> {
   await database
@@ -73,6 +74,11 @@ export async function softDeleteUser(id: string, database: Executor = db()): Pro
     .set({ email: null, name: null, imageUrl: null, deletedAt: new Date() })
     .where(and(eq(users.id, id), isNull(users.deletedAt)));
   await database.delete(providerKeys).where(eq(providerKeys.userId, id));
+  await database.delete(publishedBuilds).where(inArray(publishedBuilds.gameId, database.select({ id: games.id }).from(games).where(eq(games.ownerId, id))));
+  await database
+    .update(games)
+    .set({ publishedBuildId: null, publishedAt: null, visibility: "private", deletedAt: sql`coalesce(${games.deletedAt}, now())` })
+    .where(eq(games.ownerId, id));
 }
 
 export async function getUserById(id: string, database: Executor = db()): Promise<User | null> {

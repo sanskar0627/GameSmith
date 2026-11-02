@@ -18,6 +18,8 @@ import { isSnapshotName, sanitizeTar, SnapshotError } from "./snapshots.js";
  *   POST   /v1/sandboxes/:gameId/stop             { snapshot?: boolean }
  *   POST   /v1/sandboxes/:gameId/snapshots        { name }
  *   GET    /v1/sandboxes/:gameId/archive          tar.gz of the source
+ *   POST   /v1/sandboxes/:gameId/build            production build (JSON, base64 files)
+ *   DELETE /v1/sandboxes/:gameId                  remove container, workspace and snapshots
  *   POST   /v1/snapshots/copy                     { from, to }
  *   GET    /v1/sandboxes/:gameId/files            list
  *   GET    /v1/sandboxes/:gameId/files/<path>     read (bytes)
@@ -95,6 +97,8 @@ export function createApiServer(manager: SandboxManager, options: { token: strin
       const rest = m[3] ? decodeURIComponent(m[3].slice(1)) : "";
 
       if (action === "" && method === "GET") return send(res, 200, manager.status(gameId));
+      if (action === "" && method === "DELETE") return send(res, 200, await manager.destroy(gameId));
+      if (action === "/build" && method === "POST") return send(res, 200, await manager.build(gameId));
       if (action === "/start" && method === "POST") {
         const body = await readJson(req);
         if (body.restore !== undefined && !isSnapshotName(body.restore)) throw new ManagerError(400, "Invalid snapshot");

@@ -2,11 +2,13 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -20,7 +22,8 @@ import type { Attachment, MessagePart } from "@/lib/workspace/types";
  *
  * Phase 2 tables: users, games, game_versions, messages, webhook_events.
  * Phase 5: provider_keys. Phase 6: wallets, spark_ledger, purchases,
- * subscriptions, agent_runs. Phase 7: sandboxes (see docs/architecture.md).
+ * subscriptions, agent_runs. Phase 7: sandboxes. Phase 11: published_builds,
+ * published_files. Phase 12: users.welcomed_at (see docs/architecture.md).
  *
  * Change this file, then run `npm run db:generate` and commit the SQL
  * migration it writes to ./drizzle.
@@ -65,6 +68,8 @@ export const users = pgTable("users", {
   plan: planEnum("plan").notNull().default("free"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
+  /** When the first-run welcome was dismissed (shown once per account). */
+  welcomedAt: timestamp("welcomed_at", { withTimezone: true }),
   /** Set when the Clerk user is deleted. Personal fields are cleared at the same time. */
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
@@ -89,6 +94,9 @@ export const games = pgTable(
     currentVersion: integer("current_version").notNull().default(0),
     /** Model chosen in the composer (catalog id from lib/ai/models.ts). Null = default. */
     modelId: text("model_id"),
+    /** The build players get on /play (published_builds.id). Null = not published. */
+    publishedBuildId: uuid("published_build_id"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     /** Soft delete, so the library can offer "restore". */
@@ -344,6 +352,42 @@ export const sandboxes = pgTable("sandboxes", {
   stoppedAt: timestamp("stopped_at", { withTimezone: true }),
   updatedAt: updatedAt(),
 });
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/**
+ * A published production build of a game (Phase 11). Files are immutable
+ * once written; publishing again writes a new build and drops older ones.
+ * Served from the content origin (PUBLISHED_ORIGIN), never the app's.
+ */
+export const publishedBuilds = pgTable(
+  "published_builds",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    /** games.currentVersion when it was published (0 = before the first checkpoint). */
+    version: integer("version").notNull(),
+    files: integer("files").notNull(),
+    bytes: integer("bytes").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("published_builds_game_idx").on(t.gameId, t.createdAt.desc())],
+);
+
+export const publishedFiles = pgTable(
+  "published_files",
+  {
+    buildId: uuid("build_id")
+      .notNull()
+      .references(() => publishedBuilds.id, { onDelete: "cascade" }),
+    path: text("path").notNull(),
+    contentType: text("content_type").notNull(),
+    data: bytea("data").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.buildId, t.path] })],
+);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

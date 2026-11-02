@@ -82,3 +82,19 @@ export function runBudgetSparks(spec: ModelSpec): number {
 
 /** A run won't start with less than this available: not enough for one useful step. */
 export const MIN_RUN_SPARKS = 20;
+
+/**
+ * Game art (Fal), per image at list price. Source: fal.ai/models/<id> pricing
+ * (flux/schnell $0.003 per megapixel; bria background removal $0.018 per
+ * image). Images are at most 1 megapixel. Review with the Polar prices.
+ */
+export const ASSET_IMAGE_MODEL = "fal-ai/flux/schnell";
+export const ASSET_CUTOUT_MODEL = "fal-ai/bria/background/remove";
+export const IMAGE_COST_MICRO_USD = 3_000;
+export const CUTOUT_COST_MICRO_USD = 18_000;
+/** Most images one run may make, whoever pays. */
+export const MAX_IMAGES_PER_RUN = 12;
+
+export function imageCostMicroUsd(transparent: boolean): number {
+  return IMAGE_COST_MICRO_USD + (transparent ? CUTOUT_COST_MICRO_USD : 0);
+}

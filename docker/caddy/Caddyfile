@@ -1,0 +1,33 @@
+# GameSmith edge. Three sites, three origins:
+#   APP_DOMAIN      the app (Clerk cookies live here)
+#   PLAY_DOMAIN     published games (untrusted code; a different registrable domain)
+#   PREVIEW_DOMAIN  live sandbox previews (owner-only capability links)
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	request_body {
+		max_size 10MB
+	}
+	reverse_proxy app:3000 {
+		# Agent runs stream over SSE: never buffer.
+		flush_interval -1
+	}
+}
+
+{$PLAY_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	# Only GET of published files; the app answers 404 for anything else.
+	@notget not method GET HEAD
+	respond @notget 405
+	reverse_proxy app:3000
+}
+
+{$PREVIEW_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy sandbox-proxy:4101
+}
